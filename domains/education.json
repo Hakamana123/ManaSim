@@ -1,0 +1,76 @@
+{
+  "domain_id": "education",
+  "domain_name": "Education Technology Adoption",
+  "description": "Simulates stakeholder dynamics around the adoption of educational technology in schools and higher education institutions. Covers teacher attitudes, student experiences, administrator decisions, and policy influences.",
+
+  "semantic_scholar": {
+    "queries": [
+      "educational technology adoption barriers teachers",
+      "digital learning student engagement outcomes",
+      "edtech classroom implementation challenges",
+      "teacher professional development technology integration",
+      "equity digital divide school education"
+    ],
+    "max_results_per_query": 8,
+    "year_from": 2018
+  },
+
+  "reddit": {
+    "subreddits": [
+      "Teachers",
+      "education",
+      "edtech",
+      "highereducation",
+      "AskTeachers"
+    ],
+    "search_queries": [
+      "technology in classroom pros cons",
+      "edtech frustration burnout",
+      "AI tools students cheating",
+      "remote learning experience",
+      "school iPad laptop program"
+    ],
+    "max_posts_per_subreddit": 20,
+    "sort": "top",
+    "time_filter": "year"
+  },
+
+  "hacker_news": {
+    "queries": [
+      "education technology classroom",
+      "AI tutoring learning outcomes",
+      "edtech startup school adoption",
+      "online learning vs in person"
+    ],
+    "max_results_per_query": 10
+  },
+
+  "case_studies": {
+    "queries": [
+      "school district edtech adoption case study documented outcomes",
+      "K-12 digital transformation success failure report",
+      "university learning management system rollout case study",
+      "tablet laptop program school results evidence",
+      "AI writing tools classroom policy implementation"
+    ],
+    "max_results": 5
+  },
+
+  "source_weights": {
+    "semantic_scholar": 0.5,
+    "reddit": 0.3,
+    "hacker_news": 0.1,
+    "case_studies": 0.1
+  },
+
+  "expected_segments": [
+    "Early Adopter Teacher",
+    "Technology-Resistant Teacher",
+    "Digital Native Student",
+    "Disengaged Student",
+    "School Administrator",
+    "Education Policy Maker"
+  ],
+
+  "default_agents_per_segment": 5
+}

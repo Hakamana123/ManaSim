@@ -29,3 +29,13 @@ python-dotenv>=1.0.0
 
 # Data validation
 pydantic>=2.0.0
+
+# ============= Research agent =============
+# Reddit scraper (social data collection)
+praw>=7.7.0
+
+# Web search for case studies (no API key required)
+duckduckgo-search>=6.0.0
+
+# HTTP client used by Semantic Scholar and Hacker News scrapers
+requests>=2.31.0

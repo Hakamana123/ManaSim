@@ -1,0 +1,76 @@
+{
+  "domain_id": "organisation",
+  "domain_name": "Organisational Change Management",
+  "description": "Simulates stakeholder dynamics during large-scale organisational change initiatives — such as restructuring, digital transformation, culture shifts, or leadership transitions — within corporate, public sector, or non-profit contexts.",
+
+  "semantic_scholar": {
+    "queries": [
+      "organisational change management employee resistance",
+      "digital transformation workplace adoption barriers",
+      "change fatigue employee wellbeing organisation",
+      "leadership communication organisational restructuring",
+      "organisational culture transformation success factors"
+    ],
+    "max_results_per_query": 8,
+    "year_from": 2018
+  },
+
+  "reddit": {
+    "subreddits": [
+      "jobs",
+      "antiwork",
+      "management",
+      "humanresources",
+      "cscareerquestions"
+    ],
+    "search_queries": [
+      "company restructuring layoffs employee experience",
+      "manager change initiative resistance pushback",
+      "digital transformation forced software rollout",
+      "culture change top down failure",
+      "return to office mandate employee reaction"
+    ],
+    "max_posts_per_subreddit": 20,
+    "sort": "top",
+    "time_filter": "year"
+  },
+
+  "hacker_news": {
+    "queries": [
+      "organisational change management failure",
+      "corporate digital transformation lessons learned",
+      "remote work hybrid policy employee pushback",
+      "company culture engineering team"
+    ],
+    "max_results_per_query": 10
+  },
+
+  "case_studies": {
+    "queries": [
+      "organisational change management case study failure turnaround",
+      "corporate digital transformation documented outcomes report",
+      "large company restructuring employee response case study",
+      "culture transformation program outcomes evidence",
+      "change management resistance mitigation strategy real world"
+    ],
+    "max_results": 5
+  },
+
+  "source_weights": {
+    "semantic_scholar": 0.4,
+    "reddit": 0.35,
+    "hacker_news": 0.1,
+    "case_studies": 0.15
+  },
+
+  "expected_segments": [
+    "Change Champion",
+    "Sceptical Middle Manager",
+    "Disengaged Front-Line Employee",
+    "Senior Executive Sponsor",
+    "HR Change Lead",
+    "Resistant Long-Tenured Employee"
+  ],
+
+  "default_agents_per_segment": 5
+}
