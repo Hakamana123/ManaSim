@@ -1,203 +1,205 @@
+# ManaSim
+
 <div align="center">
 
-<img src="./static/image/MiroFish_logo_compressed.jpeg" alt="MiroFish Logo" width="75%"/>
+**Domain-adaptive swarm simulation for organisational and educational 
+decision-making.**
 
-<a href="https://trendshift.io/repositories/16144" target="_blank"><img src="https://trendshift.io/api/badge/repositories/16144" alt="666ghj%2FMiroFish | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+Built on [MiroFish](https://github.com/666ghj/MiroFish) and 
+[OASIS](https://github.com/camel-ai/oasis).  
+A [ManaEd](http://ManaEd.app) open source project.
 
-简洁通用的群体智能引擎，预测万物
-</br>
-<em>A Simple and Universal Swarm Intelligence Engine, Predicting Anything</em>
-
-<a href="https://www.shanda.com/" target="_blank"><img src="./static/image/shanda_logo.png" alt="666ghj%2MiroFish | Shanda" height="40"/></a>
-
-[![GitHub Stars](https://img.shields.io/github/stars/666ghj/MiroFish?style=flat-square&color=DAA520)](https://github.com/666ghj/MiroFish/stargazers)
-[![GitHub Watchers](https://img.shields.io/github/watchers/666ghj/MiroFish?style=flat-square)](https://github.com/666ghj/MiroFish/watchers)
-[![GitHub Forks](https://img.shields.io/github/forks/666ghj/MiroFish?style=flat-square)](https://github.com/666ghj/MiroFish/network)
-[![Docker](https://img.shields.io/badge/Docker-Build-2496ED?style=flat-square&logo=docker&logoColor=white)](https://hub.docker.com/)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/666ghj/MiroFish)
-
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/channels/1469200078932545606/1469201282077163739)
-[![X](https://img.shields.io/badge/X-Follow-000000?style=flat-square&logo=x&logoColor=white)](https://x.com/mirofish_ai)
-[![Instagram](https://img.shields.io/badge/Instagram-Follow-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://www.instagram.com/mirofish_ai/)
-
-[English](./README-EN.md) | [中文文档](./README.md)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![GitHub Stars](https://img.shields.io/github/stars/Hakamana123/ManaSim?style=flat-square)](https://github.com/Hakamana123/ManaSim/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/Hakamana123/ManaSim?style=flat-square)](https://github.com/Hakamana123/ManaSim/network)
 
 </div>
 
-## ⚡ 项目概述
+---
 
-**MiroFish** 是一款基于多智能体技术的新一代 AI 预测引擎。通过提取现实世界的种子信息（如突发新闻、政策草案、金融信号），自动构建出高保真的平行数字世界。在此空间内，成千上万个具备独立人格、长期记忆与行为逻辑的智能体进行自由交互与社会演化。你可透过「上帝视角」动态注入变量，精准推演未来走向——**让未来在数字沙盘中预演，助决策在百战模拟后胜出**。
+## What is ManaSim?
 
-> 你只需：上传种子材料（数据分析报告或者有趣的小说故事），并用自然语言描述预测需求</br>
-> MiroFish 将返回：一份详尽的预测报告，以及一个可深度交互的高保真数字世界
+MiroFish simulates public opinion on social media. ManaSim simulates how 
+real human segments respond to policies, decisions, and artefacts inside 
+organisations and learning environments.
 
-### 我们的愿景
+You upload a policy, curriculum design, org change proposal, or any 
+artefact. ManaSim researches how people like your stakeholders actually 
+behave — drawing from academic literature, government data, and Reddit 
+discussions — then simulates their response before you deploy anything 
+in the real world.
 
-MiroFish 致力于打造映射现实的群体智能镜像，通过捕捉个体互动引发的群体涌现，突破传统预测的局限：
+---
 
-- **于宏观**：我们是决策者的预演实验室，让政策与公关在零风险中试错
-- **于微观**：我们是个人用户的创意沙盘，无论是推演小说结局还是探索脑洞，皆可有趣、好玩、触手可及
+## How it works
 
-从严肃预测到趣味仿真，我们让每一个如果都能看见结果，让预测万物成为可能。
+### 1. Select your domain and upload your artefact
+Choose a simulation domain (education, organisational change, policy, 
+healthcare, or define your own). Upload the document you want to test.
 
-## 🌐 在线体验
+### 2. Research agent runs
+ManaSim's research agent automatically scrapes three source types before 
+every simulation:
 
-欢迎访问在线 Demo 演示环境，体验我们为你准备的一次关于热点舆情事件的推演预测：[mirofish-live-demo](https://666ghj.github.io/mirofish-demo/)
+- **Academic and government sources** — peer-reviewed literature and 
+  empirical studies relevant to your domain and artefact type, via 
+  Semantic Scholar and open government data
+- **Reddit** — relevant subreddit discussions surfacing real sentiment, 
+  resistance patterns, and lived experience (via PRAW)
+- **Case studies** — documented examples of similar artefacts implemented 
+  in comparable contexts
 
-## 📸 系统截图
+This runs fresh on every simulation. Agents are grounded in current 
+evidence, not static templates.
 
-<div align="center">
-<table>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图1.png" alt="截图1" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图2.png" alt="截图2" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图3.png" alt="截图3" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图4.png" alt="截图4" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图5.png" alt="截图5" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图6.png" alt="截图6" width="100%"/></td>
-</tr>
-</table>
-</div>
+### 3. Agent generation
+The research agent produces a structured set of human segments — 
+documented groups known to respond differently to this type of artefact 
+in this domain. Each segment becomes a class of agents with behavioural 
+profiles derived from evidence, not generic personality randomisation.
 
-## 🎬 演示视频
+### 4. Simulation
+Agents interact with the artefact and with each other across a 
+domain-appropriate environment. ManaSim environments model the structures 
+relevant to your context — classrooms, team meetings, policy consultations, 
+change rollouts — not social media feeds.
 
-### 1. 武汉大学舆情推演预测 + MiroFish项目讲解
+### 5. Outcome report and validation
+ManaSim produces a structured prediction report. Where historical data 
+is available, outcomes are scored against known real-world results using 
+the validation framework. Benchmark scenarios with documented outcomes 
+are included in the repo.
 
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1VYBsBHEMY/" target="_blank"><img src="./static/image/武大模拟演示封面.png" alt="MiroFish Demo Video" width="75%"/></a>
+---
 
-点击图片查看使用微舆BettaFish生成的《武大舆情报告》进行预测的完整演示视频
-</div>
+## Key differences from MiroFish
 
-### 2. 《红楼梦》失传结局推演预测
+| | MiroFish | ManaSim |
+|---|---|---|
+| Simulation environment | Twitter / Reddit social media | Classroom, organisation, policy |
+| Agent generation | Generic personality profiles | Research-grounded human segments |
+| Source data | User-uploaded documents only | Live academic, government, Reddit |
+| Memory layer | Zep Cloud (rate-limited) | Pluggable backend (Supabase stub included) |
+| Validation | None | Benchmark scenarios with scored outcomes |
+| Domain focus | General purpose | Education and organisational change |
 
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1cPk3BBExq" target="_blank"><img src="./static/image/红楼梦模拟推演封面.jpg" alt="MiroFish Demo Video" width="75%"/></a>
+---
 
-点击图片查看基于《红楼梦》前80回数十万字，MiroFish深度预测失传结局
-</div>
-
-> **金融方向推演预测**、**时政要闻推演预测**等示例陆续更新中...
-
-## 🔄 工作流程
-
-1. **图谱构建**：现实种子提取 & 个体与群体记忆注入 & GraphRAG构建
-2. **环境搭建**：实体关系抽取 & 人设生成 & 环境配置Agent注入仿真参数
-3. **开始模拟**：双平台并行模拟 & 自动解析预测需求 & 动态更新时序记忆
-4. **报告生成**：ReportAgent拥有丰富的工具集与模拟后环境进行深度交互
-5. **深度互动**：与模拟世界中的任意一位进行对话 & 与ReportAgent进行对话
-
-## 🚀 快速开始
-
-### 一、源码部署（推荐）
-
-#### 前置要求
-
-| 工具 | 版本要求 | 说明 | 安装检查 |
-|------|---------|------|---------|
-| **Node.js** | 18+ | 前端运行环境，包含 npm | `node -v` |
-| **Python** | ≥3.11, ≤3.12 | 后端运行环境 | `python --version` |
-| **uv** | 最新版 | Python 包管理器 | `uv --version` |
-
-#### 1. 配置环境变量
-
-```bash
-# 复制示例配置文件
-cp .env.example .env
-
-# 编辑 .env 文件，填入必要的 API 密钥
+## Architecture
+```
+ManaSim/
+├── backend/
+│   └── app/
+│       └── services/
+│           ├── memory/
+│           │   ├── base.py          ← abstract memory interface
+│           │   └── supabase.py      ← Supabase implementation stub
+│           ├── entity_reader.py
+│           ├── graph_builder.py
+│           ├── graph_tools.py
+│           └── memory_updater.py
+├── docs/
+│   ├── memory-layer.md              ← how to implement a memory backend
+│   └── supabase-schema.sql          ← reference schema (pgvector)
+└── frontend/                        ← Vue.js SPA
 ```
 
-**必需的环境变量：**
+---
 
+## Quick Start
+
+### Prerequisites
+
+| Tool | Version | Check |
+|------|---------|-------|
+| Node.js | 18+ | `node -v` |
+| Python | 3.11–3.12 | `python --version` |
+| uv | Latest | `uv --version` |
+
+### 1. Configure environment variables
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
 ```env
-# LLM API配置（支持 OpenAI SDK 格式的任意 LLM API）
-# 推荐使用阿里百炼平台qwen-plus模型：https://bailian.console.aliyun.com/
-# 注意消耗较大，可先进行小于40轮的模拟尝试
+# LLM — any OpenAI-compatible endpoint
 LLM_API_KEY=your_api_key
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL_NAME=qwen-plus
 
-# Zep Cloud 配置
-# 每月免费额度即可支撑简单使用：https://app.getzep.com/
-ZEP_API_KEY=your_zep_api_key
+# Memory backend
+MEMORY_BACKEND=supabase
+
+# Reddit API (required for research agent)
+REDDIT_CLIENT_ID=your_client_id
+REDDIT_CLIENT_SECRET=your_client_secret
+REDDIT_USER_AGENT=manasim:v0.1 (by u/yourusername)
 ```
 
-#### 2. 安装依赖
-
+### 2. Install dependencies
 ```bash
-# 一键安装所有依赖（根目录 + 前端 + 后端）
 npm run setup:all
 ```
 
-或者分步安装：
-
+### 3. Start
 ```bash
-# 安装 Node 依赖（根目录 + 前端）
-npm run setup
-
-# 安装 Python 依赖（后端，自动创建虚拟环境）
-npm run setup:backend
-```
-
-#### 3. 启动服务
-
-```bash
-# 同时启动前后端（在项目根目录执行）
 npm run dev
 ```
 
-**服务地址：**
-- 前端：`http://localhost:3000`
-- 后端 API：`http://localhost:5001`
+Frontend: http://localhost:3000  
+API: http://localhost:5001
 
-**单独启动：**
-
+### Docker
 ```bash
-npm run backend   # 仅启动后端
-npm run frontend  # 仅启动前端
-```
-
-### 二、Docker 部署
-
-```bash
-# 1. 配置环境变量（同源码部署）
 cp .env.example .env
-
-# 2. 拉取镜像并启动
 docker compose up -d
 ```
 
-默认会读取根目录下的 `.env`，并映射端口 `3000（前端）/5001（后端）`
+---
 
-> 在 `docker-compose.yml` 中已通过注释提供加速镜像地址，可按需替换
+## Memory backend
 
-## 📬 更多交流
+ManaSim uses a pluggable memory layer. The default backend is Supabase 
+but any backend can be implemented by creating a new module under 
+`services/memory/`.
 
-<div align="center">
-<img src="./static/image/QQ群.png" alt="QQ交流群" width="60%"/>
-</div>
+See [docs/memory-layer.md](docs/memory-layer.md) for the full interface 
+contract and implementation guide.
 
-&nbsp;
+To implement the Supabase backend:
+1. Apply `docs/supabase-schema.sql` to your Supabase project
+2. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to your `.env`
+3. Implement the methods in `services/memory/supabase.py`
 
-MiroFish团队长期招募全职/实习，如果你对多Agent应用感兴趣，欢迎投递简历至：**mirofish@shanda.com**
+---
 
-## 📄 致谢
+## Contributing
 
-**MiroFish 得到了盛大集团的战略支持和孵化！**
+ManaSim is an open research contribution. Contributions are welcome in 
+three areas:
 
-MiroFish 的仿真引擎由 **[OASIS](https://github.com/camel-ai/oasis)** 驱动，我们衷心感谢 CAMEL-AI 团队的开源贡献！
+- **Memory backends** — implement `MemoryBackend` for Neo4j, Postgres, 
+  or other stores
+- **Domain configs** — add new domain definitions with source lists and 
+  segment templates
+- **Validation scenarios** — contribute benchmark scenarios with 
+  documented real-world outcomes
 
-## 📈 项目统计
+---
 
-<a href="https://www.star-history.com/#666ghj/MiroFish&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&legend=top-left" />
- </picture>
-</a>
+## Licence
+
+GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
+
+Any modified version distributed or run as a network service must also 
+be open source under the same licence.
+
+---
+
+## Credits
+
+ManaSim is built on [MiroFish](https://github.com/666ghj/MiroFish) by 
+Guo Hangjiang, with the simulation engine powered by 
+[OASIS](https://github.com/camel-ai/oasis) from CAMEL-AI. We thank both 
+teams for their open source contributions.
