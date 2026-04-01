@@ -16,7 +16,7 @@
         <div class="hero-left">
           <div class="tag-row">
             <span class="orange-tag">简洁通用的群体智能引擎</span>
-            <span class="version-text">/ V1.0-预览版</span>
+            <span class="version-text">/ v0.1-预览版</span>
           </div>
           
           <h1 class="main-title">
@@ -690,12 +690,17 @@ const startSimulation = () => {
 .upload-zone {
   border: 1px dashed #CCC;
   height: 200px;
+  overflow-y: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s;
   background: #FAFAFA;
+}
+
+.upload-zone.has-files {
+  align-items: flex-start;
 }
 
 .upload-zone:hover {

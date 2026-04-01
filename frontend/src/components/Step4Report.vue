@@ -194,26 +194,24 @@
                     </div>
                   </template>
                   
-                  <!-- Section/Subsection Content Generated (内容生成完成，但整个章节可能还没完成) -->
-                  <template v-if="log.action === 'section_content' || log.action === 'subsection_content'">
-                    <div class="section-tag content-ready" :class="{ 'is-subsection': log.action === 'subsection_content' }">
+                  <!-- Section Content Generated (内容生成完成，但整个章节可能还没完成) -->
+                  <template v-if="log.action === 'section_content'">
+                    <div class="section-tag content-ready">
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 20h9"></path>
                         <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                       </svg>
                       <span class="tag-title">{{ log.section_title }}</span>
-                      <span v-if="log.action === 'subsection_content'" class="tag-sub">(subsection)</span>
                     </div>
                   </template>
-                  
-                  <!-- Section Complete (完整章节生成完成，含所有子章节) -->
+
+                  <!-- Section Complete (章节生成完成) -->
                   <template v-if="log.action === 'section_complete'">
                     <div class="section-tag completed">
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                       <span class="tag-title">{{ log.section_title }}</span>
-                      <span v-if="log.details?.subsection_count > 0" class="tag-sub">(+{{ log.details.subsection_count }} subsections)</span>
                     </div>
                   </template>
 
@@ -851,27 +849,36 @@ const parseInterview = (text) => {
           interview.redditAnswer = redditMatch[1].trim()
         }
         
-        // 如果只有一个平台的回答，将其作为主回答
-        // 这样无论显示哪个平台都能有内容
+        // 平台回退逻辑（兼容旧格式：只有一个平台标记的情况）
         if (!twitterMatch && redditMatch) {
-          // 只有 Reddit 回答，将其也设为 twitterAnswer 作为默认显示
-          interview.twitterAnswer = interview.redditAnswer
+          // 只有 Reddit 回答，仅在非占位文本时复制为默认显示
+          if (interview.redditAnswer && interview.redditAnswer !== '（该平台未获得回复）') {
+            interview.twitterAnswer = interview.redditAnswer
+          }
         } else if (twitterMatch && !redditMatch) {
-          // 只有 Twitter 回答，将其也设为 redditAnswer
-          interview.redditAnswer = interview.twitterAnswer
+          if (interview.twitterAnswer && interview.twitterAnswer !== '（该平台未获得回复）') {
+            interview.redditAnswer = interview.twitterAnswer
+          }
         } else if (!twitterMatch && !redditMatch) {
-          // 如果没有明确分平台，整体作为回答
+          // 没有分平台标记（极旧格式），整体作为回答
           interview.twitterAnswer = answerText
         }
       }
       
-      // 提取关键引言
+      // 提取关键引言（兼容多种引号格式）
       const quotesMatch = block.match(/\*\*关键引言:\*\*\n([\s\S]*?)(?=\n---|\n####|$)/)
       if (quotesMatch) {
         const quotesText = quotesMatch[1]
-        const quoteMatches = quotesText.match(/> "([^"]+)"/g)
+        // 优先匹配 > "text" 格式
+        let quoteMatches = quotesText.match(/> "([^"]+)"/g)
+        // 回退：匹配 > "text" 或 > \u201Ctext\u201D（中文引号）
+        if (!quoteMatches) {
+          quoteMatches = quotesText.match(/> [\u201C""]([^\u201D""]+)[\u201D""]/g)
+        }
         if (quoteMatches) {
-          interview.quotes = quoteMatches.map(q => q.replace(/^> "|"$/g, '').trim())
+          interview.quotes = quoteMatches
+            .map(q => q.replace(/^> [\u201C""]|[\u201D""]$/g, '').trim())
+            .filter(q => q)
         }
       }
       
@@ -1316,79 +1323,100 @@ const InterviewDisplay = {
       return text.substring(0, 400) + '...'
     }
     
+    // 检查是否为平台占位文本
+    const isPlaceholderText = (text) => {
+      if (!text) return true
+      const t = text.trim()
+      return t === '（该平台未获得回复）' || t === '(该平台未获得回复)' || t === '[无回复]'
+    }
+
     // 尝试按问题编号分割回答
     const splitAnswerByQuestions = (answerText, questionCount) => {
       if (!answerText || questionCount <= 0) return [answerText]
-      
-      // 更健壮的分割逻辑：查找所有 "数字." 格式的编号位置
-      // 支持格式：
-      // - "1.  \n内容" （数字+点+空格+换行+内容）
-      // - "\n\n2.  \n内容" （换行+数字+点+空格+换行+内容）
-      // 使用更宽松的匹配：开头或换行后的数字+点+空白
-      const numberPattern = /(?:^|[\r\n]+)(\d+)\.\s+/g
-      const matches = []
+      if (isPlaceholderText(answerText)) return ['']
+
+      // 支持两种编号格式：
+      // 1. "问题X：" 或 "问题X:" （中文格式，后端新格式）
+      // 2. "1. " 或 "\n1. " （数字+点，旧格式兼容）
+      let matches = []
       let match
-      
-      while ((match = numberPattern.exec(answerText)) !== null) {
+
+      // 优先尝试 "问题X：" 格式
+      const cnPattern = /(?:^|[\r\n]+)问题(\d+)[：:]\s*/g
+      while ((match = cnPattern.exec(answerText)) !== null) {
         matches.push({
           num: parseInt(match[1]),
           index: match.index,
           fullMatch: match[0]
         })
       }
-      
+
+      // 如果没匹配到，回退到 "数字." 格式
+      if (matches.length === 0) {
+        const numPattern = /(?:^|[\r\n]+)(\d+)\.\s+/g
+        while ((match = numPattern.exec(answerText)) !== null) {
+          matches.push({
+            num: parseInt(match[1]),
+            index: match.index,
+            fullMatch: match[0]
+          })
+        }
+      }
+
       // 如果没有找到编号或只找到一个，返回整体
       if (matches.length <= 1) {
-        // 尝试移除开头的编号（格式：1.  \n 或 1. ）
-        const cleaned = answerText.replace(/^\d+\.\s+/, '').trim()
+        const cleaned = answerText
+          .replace(/^问题\d+[：:]\s*/, '')
+          .replace(/^\d+\.\s+/, '')
+          .trim()
         return [cleaned || answerText]
       }
-      
+
       // 按编号提取各部分
       const parts = []
       for (let i = 0; i < matches.length; i++) {
         const current = matches[i]
         const next = matches[i + 1]
-        
+
         const startIdx = current.index + current.fullMatch.length
         const endIdx = next ? next.index : answerText.length
-        
+
         let part = answerText.substring(startIdx, endIdx).trim()
-        // 移除末尾可能的多余换行
         part = part.replace(/[\r\n]+$/, '').trim()
         parts.push(part)
       }
-      
-      // 如果分割成功且数量合理，返回分割结果
+
       if (parts.length > 0 && parts.some(p => p)) {
         return parts
       }
-      
+
       return [answerText]
     }
     
     // 获取某个问题对应的回答
     const getAnswerForQuestion = (interview, qIdx, platform) => {
       const answer = platform === 'twitter' ? interview.twitterAnswer : (interview.redditAnswer || interview.twitterAnswer)
-      if (!answer) return ''
-      
+      if (!answer || isPlaceholderText(answer)) return answer || ''
+
       const questionCount = interview.questions?.length || 1
       const answers = splitAnswerByQuestions(answer, questionCount)
-      
-      // 如果只有一个回答部分，或者索引超出，返回完整回答
-      if (answers.length === 1 || qIdx >= answers.length) {
-        return qIdx === 0 ? answer : ''
+
+      // 分割成功且索引有效
+      if (answers.length > 1 && qIdx < answers.length) {
+        return answers[qIdx] || ''
       }
-      
-      return answers[qIdx] || ''
+
+      // 分割失败：第一个问题返回完整回答，其余返回空
+      return qIdx === 0 ? answer : ''
     }
     
-    // 检查某个问题是否有双平台回答
+    // 检查某个问题是否有双平台回答（过滤占位文本）
     const hasMultiplePlatforms = (interview, qIdx) => {
       if (!interview.twitterAnswer || !interview.redditAnswer) return false
       const twitterAnswer = getAnswerForQuestion(interview, qIdx, 'twitter')
       const redditAnswer = getAnswerForQuestion(interview, qIdx, 'reddit')
-      return twitterAnswer && redditAnswer && twitterAnswer !== redditAnswer
+      // 两个平台都有真实回答（非占位文本）且内容不同
+      return !isPlaceholderText(twitterAnswer) && !isPlaceholderText(redditAnswer) && twitterAnswer !== redditAnswer
     }
     
     return () => h('div', { class: 'interview-display' }, [
@@ -1455,7 +1483,8 @@ const InterviewDisplay = {
             const hasDualPlatform = hasMultiplePlatforms(interview, qIdx)
             const expandKey = `${activeIndex.value}-${qIdx}`
             const isExpanded = expandedAnswers.value.has(expandKey)
-            
+            const isPlaceholder = isPlaceholderText(answerText)
+
             return h('div', { class: 'qa-pair', key: qIdx }, [
               // Question Block
               h('div', { class: 'qa-question' }, [
@@ -1465,14 +1494,14 @@ const InterviewDisplay = {
                   h('div', { class: 'qa-text' }, question)
                 ])
               ]),
-              
+
               // Answer Block
-              answerText && h('div', { class: 'qa-answer' }, [
+              answerText && h('div', { class: ['qa-answer', { 'answer-placeholder': isPlaceholder }] }, [
                 h('div', { class: 'qa-badge a-badge' }, `A${qIdx + 1}`),
                 h('div', { class: 'qa-content' }, [
                   h('div', { class: 'qa-answer-header' }, [
                     h('div', { class: 'qa-sender' }, interview?.name || 'Agent'),
-                    // 双平台切换按钮
+                    // 双平台切换按钮（仅在有真实双平台回答时显示）
                     hasDualPlatform && h('div', { class: 'platform-switch' }, [
                       h('button', {
                         class: ['platform-btn', { active: currentPlatform === 'twitter' }],
@@ -1496,14 +1525,16 @@ const InterviewDisplay = {
                       ])
                     ])
                   ]),
-                  h('div', { 
-                    class: 'qa-text answer-text',
-                    innerHTML: formatAnswer(answerText, isExpanded)
-                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\n/g, '<br>')
+                  h('div', {
+                    class: ['qa-text', 'answer-text', { 'placeholder-text': isPlaceholder }],
+                    innerHTML: isPlaceholder
+                      ? answerText
+                      : formatAnswer(answerText, isExpanded)
+                          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/\n/g, '<br>')
                   }),
-                  // Expand/Collapse Button
-                  answerText.length > 400 && h('button', {
+                  // Expand/Collapse Button（占位文本不显示）
+                  !isPlaceholder && answerText.length > 400 && h('button', {
                     class: 'expand-answer-btn',
                     onClick: () => toggleAnswer(expandKey)
                   }, isExpanded ? 'Show Less' : 'Show More')
@@ -1800,20 +1831,6 @@ const isSectionCompleted = (sectionIndex) => {
   return !!generatedSections.value[sectionIndex]
 }
 
-// 从 section_index 获取主章节索引
-// 后端编号方案：主章节 1,2,3... 子章节 101,102（第1章子章节1,2）
-const getMainSectionIndex = (sectionIndex) => {
-  if (sectionIndex >= 100) {
-    return Math.floor(sectionIndex / 100)
-  }
-  return sectionIndex
-}
-
-// 判断是否是子章节
-const isSubsection = (sectionIndex) => {
-  return sectionIndex >= 100
-}
-
 const formatTime = (timestamp) => {
   if (!timestamp) return ''
   try {
@@ -1870,14 +1887,29 @@ const renderMarkdown = (content) => {
   // 处理引用块
   html = html.replace(/^> (.+)$/gm, '<blockquote class="md-quote">$1</blockquote>')
   
-  // 处理无序列表
-  html = html.replace(/^- (.+)$/gm, '<li class="md-li">$1</li>')
-  html = html.replace(/(<li class="md-li">[\s\S]*?<\/li>)(\s*<li)/g, '$1$2')
-  html = html.replace(/(<li class="md-li">.*<\/li>)+/g, '<ul class="md-ul">$&</ul>')
-  
-  // 处理有序列表
-  html = html.replace(/^\d+\. (.+)$/gm, '<li class="md-oli">$1</li>')
-  html = html.replace(/(<li class="md-oli">.*<\/li>)+/g, '<ol class="md-ol">$&</ol>')
+  // 处理列表 - 支持子列表
+  html = html.replace(/^(\s*)- (.+)$/gm, (match, indent, text) => {
+    const level = Math.floor(indent.length / 2)
+    return `<li class="md-li" data-level="${level}">${text}</li>`
+  })
+  html = html.replace(/^(\s*)(\d+)\. (.+)$/gm, (match, indent, num, text) => {
+    const level = Math.floor(indent.length / 2)
+    return `<li class="md-oli" data-level="${level}">${text}</li>`
+  })
+
+  // 包装无序列表
+  html = html.replace(/(<li class="md-li"[^>]*>.*?<\/li>\s*)+/g, '<ul class="md-ul">$&</ul>')
+  // 包装有序列表
+  html = html.replace(/(<li class="md-oli"[^>]*>.*?<\/li>\s*)+/g, '<ol class="md-ol">$&</ol>')
+
+  // 清理列表项之间的所有空白
+  html = html.replace(/<\/li>\s+<li/g, '</li><li')
+  // 清理列表开始标签后的空白
+  html = html.replace(/<ul class="md-ul">\s+/g, '<ul class="md-ul">')
+  html = html.replace(/<ol class="md-ol">\s+/g, '<ol class="md-ol">')
+  // 清理列表结束标签前的空白
+  html = html.replace(/\s+<\/ul>/g, '</ul>')
+  html = html.replace(/\s+<\/ol>/g, '</ol>')
   
   // 处理粗体和斜体
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -1900,7 +1932,42 @@ const renderMarkdown = (content) => {
   html = html.replace(/(<\/h[2-5]>)<\/p>/g, '$1')
   html = html.replace(/<p class="md-p">(<ul|<ol|<blockquote|<pre|<hr)/g, '$1')
   html = html.replace(/(<\/ul>|<\/ol>|<\/blockquote>|<\/pre>)<\/p>/g, '$1')
-  
+  // 清理块级元素前后的 <br> 标签
+  html = html.replace(/<br>\s*(<ul|<ol|<blockquote)/g, '$1')
+  html = html.replace(/(<\/ul>|<\/ol>|<\/blockquote>)\s*<br>/g, '$1')
+  // 清理 <p><br> 紧跟块级元素的情况（多余空行导致）
+  html = html.replace(/<p class="md-p">(<br>\s*)+(<ul|<ol|<blockquote|<pre|<hr)/g, '$2')
+  // 清理连续的 <br> 标签
+  html = html.replace(/(<br>\s*){2,}/g, '<br>')
+  // 清理块级元素后紧跟的段落开始标签前的 <br>
+  html = html.replace(/(<\/ol>|<\/ul>|<\/blockquote>)<br>(<p|<div)/g, '$1$2')
+
+  // 修复非连续有序列表的编号：当单项 <ol> 被段落内容隔开时，保持编号递增
+  const tokens = html.split(/(<ol class="md-ol">(?:<li class="md-oli"[^>]*>[\s\S]*?<\/li>)+<\/ol>)/g)
+  let olCounter = 0
+  let inSequence = false
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i].startsWith('<ol class="md-ol">')) {
+      const liCount = (tokens[i].match(/<li class="md-oli"/g) || []).length
+      if (liCount === 1) {
+        olCounter++
+        if (olCounter > 1) {
+          tokens[i] = tokens[i].replace('<ol class="md-ol">', `<ol class="md-ol" start="${olCounter}">`)
+        }
+        inSequence = true
+      } else {
+        olCounter = 0
+        inSequence = false
+      }
+    } else if (inSequence) {
+      if (/<h[2-5]/.test(tokens[i])) {
+        olCounter = 0
+        inSequence = false
+      }
+    }
+  }
+  html = tokens.join('')
+
   return html
 }
 
@@ -1929,7 +1996,6 @@ const getActionLabel = (action) => {
     'planning_complete': 'Plan Complete',
     'section_start': 'Section Start',
     'section_content': 'Content Ready',
-    'subsection_content': 'Subsection Ready',
     'section_complete': 'Section Done',
     'tool_call': 'Tool Call',
     'tool_result': 'Tool Result',
@@ -1968,32 +2034,17 @@ const fetchAgentLog = async () => {
           }
           
           if (log.action === 'section_start') {
-            // 无论是主章节还是子章节开始，都映射到主章节索引
-            // 后端编号：主章节 1,2,3... 子章节 101,102（第1章子章节1,2）
-            const mainIndex = getMainSectionIndex(log.section_index)
-            currentSectionIndex.value = mainIndex
+            currentSectionIndex.value = log.section_index
           }
-          
-          // section_content / subsection_content - 表示内容生成完成（但整个章节可能还没完成）
-          // 这里不更新 generatedSections，只记录进度
-          if (log.action === 'section_content' || log.action === 'subsection_content') {
-            // 子章节内容生成时，保持主章节的 loading 状态
-            // 因为完整内容会在 section_complete 时一次性提供
-          }
-          
-          // section_complete - 表示完整章节（含所有子章节）生成完成
-          // details.content 包含合并后的完整内容
-          // 注意：只有主章节 complete 时才更新内容，子章节 complete 不处理
+
+          // section_complete - 章节生成完成
           if (log.action === 'section_complete') {
-            const mainIndex = getMainSectionIndex(log.section_index)
-            // 只有主章节完成时（section_index < 100）才更新内容和清除 loading
-            if (!isSubsection(log.section_index) && log.details?.content) {
-              generatedSections.value[mainIndex] = log.details.content
+            if (log.details?.content) {
+              generatedSections.value[log.section_index] = log.details.content
               // 自动展开刚生成的章节
-              expandedContent.value.add(mainIndex - 1)
+              expandedContent.value.add(log.section_index - 1)
               currentSectionIndex.value = null
             }
-            // 子章节完成时不清除 currentSectionIndex，继续显示 loading
           }
           
           if (log.action === 'report_complete') {
@@ -2461,12 +2512,13 @@ watch(() => props.reportId, (newId) => {
 
 .generated-content :deep(.md-ul),
 .generated-content :deep(.md-ol) {
-  padding-left: 20px;
-  margin-bottom: 1em;
+  padding-left: 24px;
+  margin: 12px 0;
 }
 
-.generated-content :deep(.md-li) {
-  margin-bottom: 0.5em;
+.generated-content :deep(.md-li),
+.generated-content :deep(.md-oli) {
+  margin: 6px 0;
 }
 
 .generated-content :deep(.md-quote) {
@@ -3055,10 +3107,6 @@ watch(() => props.reportId, (newId) => {
   color: var(--wf-active-dot);
 }
 
-.section-tag.content-ready.is-subsection {
-  background: var(--wf-active-bg);
-  border-color: var(--wf-active-border);
-}
 
 .section-tag.completed {
   background: #ECFDF5;
@@ -3083,12 +3131,6 @@ watch(() => props.reportId, (newId) => {
   font-size: 13px;
   font-weight: 500;
   color: #374151;
-}
-
-.tag-sub {
-  font-size: 11px;
-  color: #6B7280;
-  margin-left: 4px;
 }
 
 .tool-badge {
@@ -3953,6 +3995,15 @@ watch(() => props.reportId, (newId) => {
   padding: 0;
   border: none;
   margin-top: 0;
+}
+
+:deep(.interview-display .answer-placeholder) {
+  opacity: 0.6;
+}
+
+:deep(.interview-display .placeholder-text) {
+  font-style: italic;
+  color: #9CA3AF;
 }
 
 :deep(.interview-display .qa-answer-header) {
