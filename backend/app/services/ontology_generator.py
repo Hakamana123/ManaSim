@@ -361,7 +361,7 @@ class OntologyGenerator:
             '"""',
             '',
             'from pydantic import Field',
-            'from zep_cloud.external_clients.ontology import EntityModel, EntityText, EdgeModel',
+            '# Ontology reference — entity/edge types for the memory backend',
             '',
             '',
             '# ============== 实体类型定义 ==============',

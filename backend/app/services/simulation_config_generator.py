@@ -20,7 +20,8 @@ from openai import OpenAI
 
 from ..config import Config
 from ..utils.logger import get_logger
-from .zep_entity_reader import EntityNode, ZepEntityReader
+from .memory.base import EntityNode
+from .entity_reader import EntityReader as ZepEntityReader
 
 logger = get_logger('mirofish.simulation_config')
 
