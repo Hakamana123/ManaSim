@@ -12,7 +12,11 @@ from . import simulation_bp
 from ..config import Config
 from ..services.entity_reader import EntityReader as ZepEntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
-from ..services.simulation_manager import SimulationManager, SimulationStatus
+from ..services.simulation_manager import (
+    SimulationManager,
+    SimulationStatus,
+    _profile_file_for_environment,
+)
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..utils.logger import get_logger
 from ..models.project import ProjectManager
@@ -20,24 +24,18 @@ from ..models.project import ProjectManager
 logger = get_logger('mirofish.api.simulation')
 
 
-# Interview prompt 优化前缀
-# 添加此前缀可以避免Agent调用工具，直接用文本回复
-INTERVIEW_PROMPT_PREFIX = "结合你的人设、所有的过往记忆与行动，不调用任何工具直接用文本回复我："
+# Interview prompt prefix — prevents the agent from invoking tools and forces
+# a plain-text reply instead.
+INTERVIEW_PROMPT_PREFIX = (
+    "Drawing on your persona, all past memories, and past actions, "
+    "reply to me in plain text without calling any tools: "
+)
 
 
 def optimize_interview_prompt(prompt: str) -> str:
-    """
-    优化Interview提问，添加前缀避免Agent调用工具
-    
-    Args:
-        prompt: 原始提问
-        
-    Returns:
-        优化后的提问
-    """
+    """Prepend the interview prefix to *prompt* (idempotent)."""
     if not prompt:
         return prompt
-    # 避免重复添加前缀
     if prompt.startswith(INTERVIEW_PROMPT_PREFIX):
         return prompt
     return f"{INTERVIEW_PROMPT_PREFIX}{prompt}"
@@ -153,62 +151,51 @@ def get_entities_by_type(graph_id: str, entity_type: str):
 @simulation_bp.route('/create', methods=['POST'])
 def create_simulation():
     """
-    创建新的模拟
-    
-    注意：max_rounds等参数由LLM智能生成，无需手动设置
-    
-    请求（JSON）：
+    Create a new simulation.
+
+    Request (JSON):
         {
-            "project_id": "proj_xxxx",      // 必填
-            "graph_id": "mirofish_xxxx",    // 可选，如不提供则从project获取
-            "enable_twitter": true,          // 可选，默认true
-            "enable_reddit": true            // 可选，默认true
-        }
-    
-    返回：
-        {
-            "success": true,
-            "data": {
-                "simulation_id": "sim_xxxx",
-                "project_id": "proj_xxxx",
-                "graph_id": "mirofish_xxxx",
-                "status": "created",
-                "enable_twitter": true,
-                "enable_reddit": true,
-                "created_at": "2025-12-01T10:00:00"
-            }
+            "project_id":     "proj_xxxx",       // required
+            "graph_id":       "mirofish_xxxx",   // optional; falls back to project graph_id
+            "environment_type": "classroom",     // optional; "classroom" | "organisation" |
+                                                 //   "reddit" | "twitter" (default: "reddit")
+            // Deprecated — use environment_type instead:
+            "enable_twitter": true,
+            "enable_reddit":  true
         }
     """
     try:
         data = request.get_json() or {}
-        
+
         project_id = data.get('project_id')
         if not project_id:
             return jsonify({
                 "success": False,
-                "error": "请提供 project_id"
+                "error": "project_id is required"
             }), 400
-        
+
         project = ProjectManager.get_project(project_id)
         if not project:
             return jsonify({
                 "success": False,
-                "error": f"项目不存在: {project_id}"
+                "error": f"Project not found: {project_id}"
             }), 404
-        
+
         graph_id = data.get('graph_id') or project.graph_id
         if not graph_id:
             return jsonify({
                 "success": False,
-                "error": "项目尚未构建图谱，请先调用 /api/graph/build"
+                "error": "Project has no graph yet — call /api/graph/build first"
             }), 400
-        
+
         manager = SimulationManager()
         state = manager.create_simulation(
             project_id=project_id,
             graph_id=graph_id,
-            enable_twitter=data.get('enable_twitter', True),
-            enable_reddit=data.get('enable_reddit', True),
+            environment_type=data.get('environment_type'),
+            # Deprecated kwargs kept for backwards compatibility
+            enable_twitter=data.get('enable_twitter'),
+            enable_reddit=data.get('enable_reddit'),
         )
         
         return jsonify({
@@ -226,122 +213,128 @@ def create_simulation():
 
 
 def _check_simulation_prepared(simulation_id: str) -> tuple:
-    """
-    检查模拟是否已经准备完成
-    
-    检查条件：
-    1. state.json 存在且 status 为 "ready"
-    2. 必要文件存在：reddit_profiles.json, twitter_profiles.csv, simulation_config.json
-    
-    注意：运行脚本(run_*.py)保留在 backend/scripts/ 目录，不再复制到模拟目录
-    
-    Args:
-        simulation_id: 模拟ID
-        
+    """Check whether a simulation has been fully prepared.
+
+    Conditions:
+    1. state.json exists and can be read.
+    2. simulation_config.json exists.
+    3. The environment-specific profile file exists
+       (e.g. classroom_profiles.json, organisation_profiles.json,
+        reddit_profiles.json, or twitter_profiles.csv).
+    4. config_generated is True and status is in the "prepared" set.
+
+    Simulation scripts remain in backend/scripts/ and are NOT copied here.
+
     Returns:
         (is_prepared: bool, info: dict)
     """
-    import os
+    import json
     from ..config import Config
-    
+    from datetime import datetime
+
     simulation_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
-    
-    # 检查目录是否存在
+
     if not os.path.exists(simulation_dir):
-        return False, {"reason": "模拟目录不存在"}
-    
-    # 必要文件列表（不包括脚本，脚本位于 backend/scripts/）
-    required_files = [
-        "state.json",
-        "simulation_config.json",
-        "reddit_profiles.json",
-        "twitter_profiles.csv"
-    ]
-    
-    # 检查文件是否存在
-    existing_files = []
-    missing_files = []
-    for f in required_files:
-        file_path = os.path.join(simulation_dir, f)
-        if os.path.exists(file_path):
-            existing_files.append(f)
-        else:
-            missing_files.append(f)
-    
-    if missing_files:
-        return False, {
-            "reason": "缺少必要文件",
-            "missing_files": missing_files,
-            "existing_files": existing_files
-        }
-    
-    # 检查state.json中的状态
+        return False, {"reason": "Simulation directory not found"}
+
     state_file = os.path.join(simulation_dir, "state.json")
+    if not os.path.exists(state_file):
+        return False, {"reason": "state.json not found"}
+
     try:
-        import json
         with open(state_file, 'r', encoding='utf-8') as f:
             state_data = json.load(f)
-        
-        status = state_data.get("status", "")
-        config_generated = state_data.get("config_generated", False)
-        
-        # 详细日志
-        logger.debug(f"检测模拟准备状态: {simulation_id}, status={status}, config_generated={config_generated}")
-        
-        # 如果 config_generated=True 且文件存在，认为准备完成
-        # 以下状态都说明准备工作已完成：
-        # - ready: 准备完成，可以运行
-        # - preparing: 如果 config_generated=True 说明已完成
-        # - running: 正在运行，说明准备早就完成了
-        # - completed: 运行完成，说明准备早就完成了
-        # - stopped: 已停止，说明准备早就完成了
-        # - failed: 运行失败（但准备是完成的）
-        prepared_statuses = ["ready", "preparing", "running", "completed", "stopped", "failed"]
-        if status in prepared_statuses and config_generated:
-            # 获取文件统计信息
-            profiles_file = os.path.join(simulation_dir, "reddit_profiles.json")
-            config_file = os.path.join(simulation_dir, "simulation_config.json")
-            
-            profiles_count = 0
-            if os.path.exists(profiles_file):
-                with open(profiles_file, 'r', encoding='utf-8') as f:
-                    profiles_data = json.load(f)
-                    profiles_count = len(profiles_data) if isinstance(profiles_data, list) else 0
-            
-            # 如果状态是preparing但文件已完成，自动更新状态为ready
-            if status == "preparing":
-                try:
-                    state_data["status"] = "ready"
-                    from datetime import datetime
-                    state_data["updated_at"] = datetime.now().isoformat()
-                    with open(state_file, 'w', encoding='utf-8') as f:
-                        json.dump(state_data, f, ensure_ascii=False, indent=2)
-                    logger.info(f"自动更新模拟状态: {simulation_id} preparing -> ready")
-                    status = "ready"
-                except Exception as e:
-                    logger.warning(f"自动更新状态失败: {e}")
-            
-            logger.info(f"模拟 {simulation_id} 检测结果: 已准备完成 (status={status}, config_generated={config_generated})")
-            return True, {
-                "status": status,
-                "entities_count": state_data.get("entities_count", 0),
-                "profiles_count": profiles_count,
-                "entity_types": state_data.get("entity_types", []),
-                "config_generated": config_generated,
-                "created_at": state_data.get("created_at"),
-                "updated_at": state_data.get("updated_at"),
-                "existing_files": existing_files
-            }
-        else:
-            logger.warning(f"模拟 {simulation_id} 检测结果: 未准备完成 (status={status}, config_generated={config_generated})")
-            return False, {
-                "reason": f"状态不在已准备列表中或config_generated为false: status={status}, config_generated={config_generated}",
-                "status": status,
-                "config_generated": config_generated
-            }
-            
     except Exception as e:
-        return False, {"reason": f"读取状态文件失败: {str(e)}"}
+        return False, {"reason": f"Failed to read state.json: {e}"}
+
+    # Derive environment_type from state (with legacy fallback)
+    env_type = state_data.get("environment_type")
+    if not env_type:
+        if state_data.get("enable_twitter") and not state_data.get("enable_reddit"):
+            env_type = "twitter"
+        else:
+            env_type = "reddit"
+
+    # Build the required-file list for this environment
+    profile_filename, _ = _profile_file_for_environment(env_type)
+    required_files = ["state.json", "simulation_config.json", profile_filename]
+
+    existing_files = []
+    missing_files = []
+    for fname in required_files:
+        fpath = os.path.join(simulation_dir, fname)
+        if os.path.exists(fpath):
+            existing_files.append(fname)
+        else:
+            missing_files.append(fname)
+
+    if missing_files:
+        return False, {
+            "reason": "Required files missing",
+            "missing_files": missing_files,
+            "existing_files": existing_files,
+        }
+
+    status = state_data.get("status", "")
+    config_generated = state_data.get("config_generated", False)
+
+    logger.debug(
+        "Simulation %s preparation check: status=%s, config_generated=%s, env=%s",
+        simulation_id, status, config_generated, env_type,
+    )
+
+    prepared_statuses = ["ready", "preparing", "running", "completed", "stopped", "failed"]
+    if status in prepared_statuses and config_generated:
+        # Count profiles for info
+        profiles_count = 0
+        profiles_path = os.path.join(simulation_dir, profile_filename)
+        if os.path.exists(profiles_path):
+            try:
+                with open(profiles_path, 'r', encoding='utf-8') as f:
+                    profiles_data = json.load(f)
+                profiles_count = len(profiles_data) if isinstance(profiles_data, list) else 0
+            except Exception:
+                pass
+
+        # Auto-advance stuck "preparing" state to "ready"
+        if status == "preparing":
+            try:
+                state_data["status"] = "ready"
+                state_data["updated_at"] = datetime.now().isoformat()
+                with open(state_file, 'w', encoding='utf-8') as f:
+                    json.dump(state_data, f, ensure_ascii=False, indent=2)
+                logger.info("Auto-advanced simulation %s: preparing → ready", simulation_id)
+                status = "ready"
+            except Exception as e:
+                logger.warning("Failed to auto-advance simulation status: %s", e)
+
+        logger.info(
+            "Simulation %s is prepared (status=%s, config_generated=%s, env=%s)",
+            simulation_id, status, config_generated, env_type,
+        )
+        return True, {
+            "status": status,
+            "environment_type": env_type,
+            "entities_count": state_data.get("entities_count", 0),
+            "profiles_count": profiles_count,
+            "entity_types": state_data.get("entity_types", []),
+            "config_generated": config_generated,
+            "created_at": state_data.get("created_at"),
+            "updated_at": state_data.get("updated_at"),
+            "existing_files": existing_files,
+        }
+    else:
+        logger.warning(
+            "Simulation %s not prepared: status=%s, config_generated=%s",
+            simulation_id, status, config_generated,
+        )
+        return False, {
+            "reason": (
+                f"Status '{status}' not in prepared set or config_generated=False"
+            ),
+            "status": status,
+            "config_generated": config_generated,
+        }
 
 
 @simulation_bp.route('/prepare', methods=['POST'])
@@ -455,6 +448,7 @@ def prepare_simulation():
         entity_types_list = data.get('entity_types')
         use_llm_for_profiles = data.get('use_llm_for_profiles', True)
         parallel_profile_count = data.get('parallel_profile_count', 5)
+        environment_type = data.get('environment_type')  # optional override
         
         # ========== 同步获取实体数量（在后台任务启动前） ==========
         # 这样前端在调用prepare后立即就能获取到预期Agent总数
@@ -571,7 +565,8 @@ def prepare_simulation():
                     defined_entity_types=entity_types_list,
                     use_llm_for_profiles=use_llm_for_profiles,
                     progress_callback=progress_callback,
-                    parallel_profile_count=parallel_profile_count
+                    parallel_profile_count=parallel_profile_count,
+                    environment_type=environment_type,
                 )
                 
                 # 任务完成
@@ -1053,11 +1048,9 @@ def get_simulation_profiles_realtime(simulation_id: str):
                 "error": f"模拟不存在: {simulation_id}"
             }), 404
         
-        # 确定文件路径
-        if platform == "reddit":
-            profiles_file = os.path.join(sim_dir, "reddit_profiles.json")
-        else:
-            profiles_file = os.path.join(sim_dir, "twitter_profiles.csv")
+        # Determine profile file for the requested environment/platform
+        profile_filename, _ = _profile_file_for_environment(platform)
+        profiles_file = os.path.join(sim_dir, profile_filename)
         
         # 检查文件是否存在
         file_exists = os.path.exists(profiles_file)
@@ -1070,15 +1063,15 @@ def get_simulation_profiles_realtime(simulation_id: str):
             file_modified_at = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
             
             try:
-                if platform == "reddit":
-                    with open(profiles_file, 'r', encoding='utf-8') as f:
-                        profiles = json.load(f)
-                else:
+                if profiles_file.endswith(".csv"):
                     with open(profiles_file, 'r', encoding='utf-8') as f:
                         reader = csv.DictReader(f)
                         profiles = list(reader)
-            except (json.JSONDecodeError, Exception) as e:
-                logger.warning(f"读取 profiles 文件失败（可能正在写入中）: {e}")
+                else:
+                    with open(profiles_file, 'r', encoding='utf-8') as f:
+                        profiles = json.load(f)
+            except Exception as e:
+                logger.warning("Failed to read profiles file (may still be writing): %s", e)
                 profiles = []
         
         # 检查是否正在生成（通过 state.json 判断）
