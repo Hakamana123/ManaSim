@@ -1,12 +1,23 @@
 """
-OASIS模拟管理器
-管理Twitter和Reddit双平台并行模拟
-使用预设脚本 + LLM智能生成配置参数
+Simulation manager.
+
+Orchestrates the full preparation pipeline for a ManaSim simulation:
+  1. Read and filter entities from the memory graph.
+  2. Generate OASIS agent profiles — either from research pipeline output
+     (ProfileBridge) or directly from graph entities (OasisProfileGenerator).
+  3. LLM-generate simulation configuration parameters.
+  4. Save all artefacts to the simulation directory.
+
+Supports domain environments:
+  - "classroom"    — uses Reddit OASIS platform (threaded discussion)
+  - "organisation" — uses Twitter OASIS platform (broadcast / response)
+  - "twitter"      — legacy social-media (Twitter OASIS)
+  - "reddit"       — legacy social-media (Reddit OASIS)
 """
 
 import os
 import json
-import shutil
+import traceback as tb
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -17,163 +28,249 @@ from ..utils.logger import get_logger
 from .entity_reader import EntityReader as ZepEntityReader
 from .memory.base import FilteredEntities
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
-from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
+from .simulation_config_generator import (
+    SimulationConfigGenerator,
+    SimulationParameters,
+    ENVIRONMENT_CLASSROOM,
+    ENVIRONMENT_ORGANISATION,
+    ENVIRONMENT_TWITTER,
+    ENVIRONMENT_REDDIT,
+    OASIS_PLATFORM_MAP,
+)
 
 logger = get_logger('mirofish.simulation')
 
 
+# ---------------------------------------------------------------------------
+# Environment type helpers
+# ---------------------------------------------------------------------------
+
+# All recognised environment type strings
+VALID_ENVIRONMENTS = {
+    ENVIRONMENT_CLASSROOM,
+    ENVIRONMENT_ORGANISATION,
+    ENVIRONMENT_TWITTER,
+    ENVIRONMENT_REDDIT,
+}
+
+
+def _derive_environment_from_legacy(
+    enable_twitter: bool, enable_reddit: bool
+) -> str:
+    """Convert old boolean flags to an environment_type string."""
+    if enable_twitter and not enable_reddit:
+        return ENVIRONMENT_TWITTER
+    return ENVIRONMENT_REDDIT
+
+
+def _profile_file_for_environment(environment_type: str):
+    """
+    Return (filename, oasis_format) for profile serialisation.
+
+    oasis_format is the string passed to OasisProfileGenerator.save_profiles()
+    (and eventually to oasis_profile_generator.py step 7).
+
+    Both new domain environments use JSON so that the new simulation scripts
+    can load them via generate_reddit_agent_graph / generate_twitter_agent_graph
+    with a JSON-aware wrapper (implemented in step 7).
+    """
+    mapping = {
+        ENVIRONMENT_CLASSROOM:    ("classroom_profiles.json",    "classroom"),
+        ENVIRONMENT_ORGANISATION: ("organisation_profiles.json", "organisation"),
+        ENVIRONMENT_TWITTER:      ("twitter_profiles.csv",       "twitter"),
+        ENVIRONMENT_REDDIT:       ("reddit_profiles.json",       "reddit"),
+    }
+    return mapping.get(environment_type, ("reddit_profiles.json", "reddit"))
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
 class SimulationStatus(str, Enum):
-    """模拟状态"""
-    CREATED = "created"
+    CREATED   = "created"
     PREPARING = "preparing"
-    READY = "ready"
-    RUNNING = "running"
-    PAUSED = "paused"
-    STOPPED = "stopped"      # 模拟被手动停止
-    COMPLETED = "completed"  # 模拟自然完成
-    FAILED = "failed"
+    READY     = "ready"
+    RUNNING   = "running"
+    PAUSED    = "paused"
+    STOPPED   = "stopped"
+    COMPLETED = "completed"
+    FAILED    = "failed"
 
 
-class PlatformType(str, Enum):
-    """平台类型"""
-    TWITTER = "twitter"
-    REDDIT = "reddit"
+class EnvironmentType(str, Enum):
+    """Domain environment for the simulation."""
+    CLASSROOM    = ENVIRONMENT_CLASSROOM
+    ORGANISATION = ENVIRONMENT_ORGANISATION
+    TWITTER      = ENVIRONMENT_TWITTER   # legacy
+    REDDIT       = ENVIRONMENT_REDDIT    # legacy
 
+
+# Backwards-compatible alias
+PlatformType = EnvironmentType
+
+
+# ---------------------------------------------------------------------------
+# SimulationState
+# ---------------------------------------------------------------------------
 
 @dataclass
 class SimulationState:
-    """模拟状态"""
+    """Persistent state for a single simulation run."""
+
     simulation_id: str
-    project_id: str
-    graph_id: str
-    
-    # 平台启用状态
-    enable_twitter: bool = True
-    enable_reddit: bool = True
-    
-    # 状态
+    project_id:    str
+    graph_id:      str
+
+    # Domain environment
+    environment_type: str = ENVIRONMENT_REDDIT
+
+    # Lifecycle status
     status: SimulationStatus = SimulationStatus.CREATED
-    
-    # 准备阶段数据
+
+    # Preparation summary
     entities_count: int = 0
     profiles_count: int = 0
-    entity_types: List[str] = field(default_factory=list)
-    
-    # 配置生成信息
-    config_generated: bool = False
-    config_reasoning: str = ""
-    
-    # 运行时数据
-    current_round: int = 0
-    twitter_status: str = "not_started"
-    reddit_status: str = "not_started"
-    
-    # 时间戳
+    entity_types:   List[str] = field(default_factory=list)
+
+    # Config generation
+    config_generated:  bool = False
+    config_reasoning:  str  = ""
+
+    # Runtime progress
+    current_round:      int = 0
+    environment_status: str = "not_started"
+
+    # Timestamps
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
-    # 错误信息
+
+    # Error detail
     error: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """完整状态字典（内部使用）"""
+        """Full state dict (persisted to state.json and used internally)."""
+        oasis_platform = OASIS_PLATFORM_MAP.get(self.environment_type, "reddit")
         return {
-            "simulation_id": self.simulation_id,
-            "project_id": self.project_id,
-            "graph_id": self.graph_id,
-            "enable_twitter": self.enable_twitter,
-            "enable_reddit": self.enable_reddit,
-            "status": self.status.value,
-            "entities_count": self.entities_count,
-            "profiles_count": self.profiles_count,
-            "entity_types": self.entity_types,
+            "simulation_id":    self.simulation_id,
+            "project_id":       self.project_id,
+            "graph_id":         self.graph_id,
+            "environment_type": self.environment_type,
+            "status":           self.status.value,
+            "entities_count":   self.entities_count,
+            "profiles_count":   self.profiles_count,
+            "entity_types":     self.entity_types,
             "config_generated": self.config_generated,
             "config_reasoning": self.config_reasoning,
-            "current_round": self.current_round,
-            "twitter_status": self.twitter_status,
-            "reddit_status": self.reddit_status,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "error": self.error,
-        }
-    
-    def to_simple_dict(self) -> Dict[str, Any]:
-        """简化状态字典（API返回使用）"""
-        return {
-            "simulation_id": self.simulation_id,
-            "project_id": self.project_id,
-            "graph_id": self.graph_id,
-            "status": self.status.value,
-            "entities_count": self.entities_count,
-            "profiles_count": self.profiles_count,
-            "entity_types": self.entity_types,
-            "config_generated": self.config_generated,
-            "error": self.error,
+            "current_round":    self.current_round,
+            "environment_status": self.environment_status,
+            # Legacy keys kept so that any frontend / runner code that still
+            # reads enable_twitter / enable_reddit / twitter_status continues
+            # to receive sensible values.
+            "enable_twitter":   oasis_platform == "twitter",
+            "enable_reddit":    oasis_platform == "reddit",
+            "twitter_status":   self.environment_status if oasis_platform == "twitter" else "not_started",
+            "reddit_status":    self.environment_status if oasis_platform == "reddit"  else "not_started",
+            "created_at":       self.created_at,
+            "updated_at":       self.updated_at,
+            "error":            self.error,
         }
 
+    def to_simple_dict(self) -> Dict[str, Any]:
+        """Slim dict returned by the API."""
+        return {
+            "simulation_id":    self.simulation_id,
+            "project_id":       self.project_id,
+            "graph_id":         self.graph_id,
+            "environment_type": self.environment_type,
+            "status":           self.status.value,
+            "entities_count":   self.entities_count,
+            "profiles_count":   self.profiles_count,
+            "entity_types":     self.entity_types,
+            "config_generated": self.config_generated,
+            "error":            self.error,
+        }
+
+
+# ---------------------------------------------------------------------------
+# SimulationManager
+# ---------------------------------------------------------------------------
 
 class SimulationManager:
     """
-    模拟管理器
-    
-    核心功能：
-    1. 从Zep图谱读取实体并过滤
-    2. 生成OASIS Agent Profile
-    3. 使用LLM智能生成模拟配置参数
-    4. 准备预设脚本所需的所有文件
+    Manages the preparation lifecycle for OASIS simulations.
+
+    Core responsibilities:
+      1. Read and filter entities from the Zep memory graph.
+      2. Generate OASIS agent profiles (from research output or graph entities).
+      3. LLM-generate simulation configuration.
+      4. Write artefacts to the simulation directory.
     """
-    
-    # 模拟数据存储目录
+
     SIMULATION_DATA_DIR = os.path.join(
-        os.path.dirname(__file__), 
+        os.path.dirname(__file__),
         '../../uploads/simulations'
     )
-    
+
     def __init__(self):
-        # 确保目录存在
         os.makedirs(self.SIMULATION_DATA_DIR, exist_ok=True)
-        
-        # 内存中的模拟状态缓存
         self._simulations: Dict[str, SimulationState] = {}
-    
+
+    # ------------------------------------------------------------------
+    # Directory helpers
+    # ------------------------------------------------------------------
+
     def _get_simulation_dir(self, simulation_id: str) -> str:
-        """获取模拟数据目录"""
         sim_dir = os.path.join(self.SIMULATION_DATA_DIR, simulation_id)
         os.makedirs(sim_dir, exist_ok=True)
         return sim_dir
-    
-    def _save_simulation_state(self, state: SimulationState):
-        """保存模拟状态到文件"""
+
+    # ------------------------------------------------------------------
+    # State persistence
+    # ------------------------------------------------------------------
+
+    def _save_simulation_state(self, state: SimulationState) -> None:
         sim_dir = self._get_simulation_dir(state.simulation_id)
         state_file = os.path.join(sim_dir, "state.json")
-        
         state.updated_at = datetime.now().isoformat()
-        
         with open(state_file, 'w', encoding='utf-8') as f:
             json.dump(state.to_dict(), f, ensure_ascii=False, indent=2)
-        
         self._simulations[state.simulation_id] = state
-    
+
     def _load_simulation_state(self, simulation_id: str) -> Optional[SimulationState]:
-        """从文件加载模拟状态"""
         if simulation_id in self._simulations:
             return self._simulations[simulation_id]
-        
+
         sim_dir = self._get_simulation_dir(simulation_id)
         state_file = os.path.join(sim_dir, "state.json")
-        
         if not os.path.exists(state_file):
             return None
-        
+
         with open(state_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
+        # Derive environment_type — prefer explicit field, fall back to
+        # legacy enable_twitter / enable_reddit booleans.
+        environment_type = data.get("environment_type")
+        if not environment_type or environment_type not in VALID_ENVIRONMENTS:
+            environment_type = _derive_environment_from_legacy(
+                data.get("enable_twitter", False),
+                data.get("enable_reddit", True),
+            )
+
+        # Derive environment_status from legacy twitter_status / reddit_status
+        oasis_platform = OASIS_PLATFORM_MAP.get(environment_type, "reddit")
+        if oasis_platform == "twitter":
+            legacy_status = data.get("twitter_status", "not_started")
+        else:
+            legacy_status = data.get("reddit_status", "not_started")
+        environment_status = data.get("environment_status", legacy_status)
+
         state = SimulationState(
             simulation_id=simulation_id,
             project_id=data.get("project_id", ""),
             graph_id=data.get("graph_id", ""),
-            enable_twitter=data.get("enable_twitter", True),
-            enable_reddit=data.get("enable_reddit", True),
+            environment_type=environment_type,
             status=SimulationStatus(data.get("status", "created")),
             entities_count=data.get("entities_count", 0),
             profiles_count=data.get("profiles_count", 0),
@@ -181,349 +278,469 @@ class SimulationManager:
             config_generated=data.get("config_generated", False),
             config_reasoning=data.get("config_reasoning", ""),
             current_round=data.get("current_round", 0),
-            twitter_status=data.get("twitter_status", "not_started"),
-            reddit_status=data.get("reddit_status", "not_started"),
+            environment_status=environment_status,
             created_at=data.get("created_at", datetime.now().isoformat()),
             updated_at=data.get("updated_at", datetime.now().isoformat()),
             error=data.get("error"),
         )
-        
+
         self._simulations[simulation_id] = state
         return state
-    
+
+    # ------------------------------------------------------------------
+    # Public: create
+    # ------------------------------------------------------------------
+
     def create_simulation(
         self,
-        project_id: str,
-        graph_id: str,
-        enable_twitter: bool = True,
-        enable_reddit: bool = True,
+        project_id:       str,
+        graph_id:         str,
+        environment_type: str = ENVIRONMENT_REDDIT,
+        # Legacy params — kept for backwards compatibility, deprecated.
+        enable_twitter:   Optional[bool] = None,
+        enable_reddit:    Optional[bool] = None,
     ) -> SimulationState:
         """
-        创建新的模拟
-        
+        Create a new simulation record.
+
         Args:
-            project_id: 项目ID
-            graph_id: Zep图谱ID
-            enable_twitter: 是否启用Twitter模拟
-            enable_reddit: 是否启用Reddit模拟
-            
+            project_id:       Parent project ID.
+            graph_id:         Memory graph ID.
+            environment_type: Domain environment — "classroom", "organisation",
+                              "twitter", or "reddit".
+            enable_twitter:   Deprecated. Use environment_type="twitter".
+            enable_reddit:    Deprecated. Use environment_type="reddit".
+
         Returns:
             SimulationState
         """
+        # Handle legacy boolean flags
+        if enable_twitter is not None or enable_reddit is not None:
+            logger.warning(
+                "enable_twitter / enable_reddit are deprecated in "
+                "create_simulation(); use environment_type instead."
+            )
+            environment_type = _derive_environment_from_legacy(
+                bool(enable_twitter), bool(enable_reddit)
+            )
+
+        if environment_type not in VALID_ENVIRONMENTS:
+            logger.warning(
+                "Unknown environment_type '%s'; falling back to '%s'.",
+                environment_type, ENVIRONMENT_REDDIT,
+            )
+            environment_type = ENVIRONMENT_REDDIT
+
         import uuid
         simulation_id = f"sim_{uuid.uuid4().hex[:12]}"
-        
+
         state = SimulationState(
             simulation_id=simulation_id,
             project_id=project_id,
             graph_id=graph_id,
-            enable_twitter=enable_twitter,
-            enable_reddit=enable_reddit,
+            environment_type=environment_type,
             status=SimulationStatus.CREATED,
         )
-        
+
         self._save_simulation_state(state)
-        logger.info(f"创建模拟: {simulation_id}, project={project_id}, graph={graph_id}")
-        
+        logger.info(
+            "Simulation created: id=%s project=%s graph=%s environment=%s",
+            simulation_id, project_id, graph_id, environment_type,
+        )
         return state
-    
+
+    # ------------------------------------------------------------------
+    # Public: prepare
+    # ------------------------------------------------------------------
+
     def prepare_simulation(
         self,
-        simulation_id: str,
+        simulation_id:         str,
         simulation_requirement: str,
-        document_text: str,
-        defined_entity_types: Optional[List[str]] = None,
-        use_llm_for_profiles: bool = True,
-        progress_callback: Optional[callable] = None,
-        parallel_profile_count: int = 3
+        document_text:          str,
+        defined_entity_types:  Optional[List[str]] = None,
+        use_llm_for_profiles:  bool = True,
+        progress_callback:     Optional[callable] = None,
+        parallel_profile_count: int = 3,
+        # Research pipeline integration (Session 3 → Session 4 wiring)
+        research_output=None,   # Optional[ResearchOutput] from research/schemas.py
+        agents_per_segment: int = 5,
     ) -> SimulationState:
         """
-        准备模拟环境（全程自动化）
-        
-        步骤：
-        1. 从Zep图谱读取并过滤实体
-        2. 为每个实体生成OASIS Agent Profile（可选LLM增强，支持并行）
-        3. 使用LLM智能生成模拟配置参数（时间、活跃度、发言频率等）
-        4. 保存配置文件和Profile文件
-        5. 复制预设脚本到模拟目录
-        
+        Prepare the simulation environment end-to-end.
+
+        Steps:
+          1. Read and filter entities from the memory graph.
+          2. Generate agent profiles:
+               - If research_output is provided, use ProfileBridge (research pipeline).
+               - Otherwise, use OasisProfileGenerator (entity-based).
+          3. LLM-generate simulation configuration.
+          4. Save profile file and configuration to the simulation directory.
+
         Args:
-            simulation_id: 模拟ID
-            simulation_requirement: 模拟需求描述（用于LLM生成配置）
-            document_text: 原始文档内容（用于LLM理解背景）
-            defined_entity_types: 预定义的实体类型（可选）
-            use_llm_for_profiles: 是否使用LLM生成详细人设
-            progress_callback: 进度回调函数 (stage, progress, message)
-            parallel_profile_count: 并行生成人设的数量，默认3
-            
+            simulation_id:          ID of a simulation created via create_simulation().
+            simulation_requirement: Human-readable scenario description.
+            document_text:          Source document text (LLM context).
+            defined_entity_types:   Optional entity-type filter for the graph.
+            use_llm_for_profiles:   Whether to use LLM for entity-based profiles.
+            progress_callback:      Optional fn(stage, pct, message, **kwargs).
+            parallel_profile_count: Parallel workers for entity-based generation.
+            research_output:        Optional ResearchOutput from the research agent.
+                                    When supplied, ProfileBridge is used instead of
+                                    OasisProfileGenerator.
+            agents_per_segment:     Agents to generate per research segment
+                                    (only used when research_output is provided).
+
         Returns:
             SimulationState
         """
         state = self._load_simulation_state(simulation_id)
         if not state:
-            raise ValueError(f"模拟不存在: {simulation_id}")
-        
+            raise ValueError(f"Simulation not found: {simulation_id}")
+
         try:
             state.status = SimulationStatus.PREPARING
             self._save_simulation_state(state)
-            
+
             sim_dir = self._get_simulation_dir(simulation_id)
-            
-            # ========== 阶段1: 读取并过滤实体 ==========
+            environment_type = state.environment_type
+            oasis_platform = OASIS_PLATFORM_MAP.get(environment_type, "reddit")
+
+            # ---- Stage 1: read entities from memory graph ----
             if progress_callback:
-                progress_callback("reading", 0, "正在连接Zep图谱...")
-            
+                progress_callback("reading", 0, "Connecting to memory graph...")
+
             reader = ZepEntityReader()
-            
+
             if progress_callback:
-                progress_callback("reading", 30, "正在读取节点数据...")
-            
+                progress_callback("reading", 30, "Reading entity nodes...")
+
             filtered = reader.filter_defined_entities(
                 graph_id=state.graph_id,
                 defined_entity_types=defined_entity_types,
-                enrich_with_edges=True
+                enrich_with_edges=True,
             )
-            
+
             state.entities_count = filtered.filtered_count
-            state.entity_types = list(filtered.entity_types)
-            
+            state.entity_types   = list(filtered.entity_types)
+
             if progress_callback:
                 progress_callback(
-                    "reading", 100, 
-                    f"完成，共 {filtered.filtered_count} 个实体",
+                    "reading", 100,
+                    f"Done — {filtered.filtered_count} entities found.",
                     current=filtered.filtered_count,
-                    total=filtered.filtered_count
+                    total=filtered.filtered_count,
                 )
-            
+
             if filtered.filtered_count == 0:
                 state.status = SimulationStatus.FAILED
-                state.error = "没有找到符合条件的实体，请检查图谱是否正确构建"
+                state.error  = (
+                    "No entities found in the memory graph. "
+                    "Please check that the graph has been built correctly."
+                )
                 self._save_simulation_state(state)
                 return state
-            
-            # ========== 阶段2: 生成Agent Profile ==========
-            total_entities = len(filtered.entities)
-            
-            if progress_callback:
-                progress_callback(
-                    "generating_profiles", 0, 
-                    "开始生成...",
-                    current=0,
-                    total=total_entities
-                )
-            
-            # 传入graph_id以启用Zep检索功能，获取更丰富的上下文
-            generator = OasisProfileGenerator(graph_id=state.graph_id)
-            
-            def profile_progress(current, total, msg):
-                if progress_callback:
-                    progress_callback(
-                        "generating_profiles", 
-                        int(current / total * 100), 
-                        msg,
-                        current=current,
-                        total=total,
-                        item_name=msg
-                    )
-            
-            # 设置实时保存的文件路径（优先使用 Reddit JSON 格式）
-            realtime_output_path = None
-            realtime_platform = "reddit"
-            if state.enable_reddit:
-                realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
-                realtime_platform = "reddit"
-            elif state.enable_twitter:
-                realtime_output_path = os.path.join(sim_dir, "twitter_profiles.csv")
-                realtime_platform = "twitter"
-            
-            profiles = generator.generate_profiles_from_entities(
-                entities=filtered.entities,
-                use_llm=use_llm_for_profiles,
-                progress_callback=profile_progress,
-                graph_id=state.graph_id,  # 传入graph_id用于Zep检索
-                parallel_count=parallel_profile_count,  # 并行生成数量
-                realtime_output_path=realtime_output_path,  # 实时保存路径
-                output_platform=realtime_platform  # 输出格式
+
+            # ---- Stage 2: generate agent profiles ----
+            profile_filename, profile_format = _profile_file_for_environment(
+                environment_type
             )
-            
+            profile_path     = os.path.join(sim_dir, profile_filename)
+            total_entities   = len(filtered.entities)
+
+            if progress_callback:
+                progress_callback(
+                    "generating_profiles", 0, "Starting profile generation...",
+                    current=0, total=total_entities,
+                )
+
+            if research_output is not None:
+                # -- Research-pipeline path --
+                profiles = self._generate_profiles_from_research(
+                    research_output=research_output,
+                    agents_per_segment=agents_per_segment,
+                    output_platform=oasis_platform,
+                    progress_callback=progress_callback,
+                )
+            else:
+                # -- Entity-based path --
+                profiles = self._generate_profiles_from_entities(
+                    filtered=filtered,
+                    graph_id=state.graph_id,
+                    use_llm=use_llm_for_profiles,
+                    parallel_count=parallel_profile_count,
+                    realtime_output_path=profile_path,
+                    output_platform=profile_format,
+                    progress_callback=progress_callback,
+                )
+
             state.profiles_count = len(profiles)
-            
-            # 保存Profile文件（注意：Twitter使用CSV格式，Reddit使用JSON格式）
-            # Reddit 已经在生成过程中实时保存了，这里再保存一次确保完整性
+
+            # Save the final profile file (entity path already streams to disk;
+            # research path needs an explicit save here).
             if progress_callback:
                 progress_callback(
-                    "generating_profiles", 95, 
-                    "保存Profile文件...",
-                    current=total_entities,
-                    total=total_entities
+                    "generating_profiles", 95, "Saving profile file...",
+                    current=total_entities, total=total_entities,
                 )
-            
-            if state.enable_reddit:
-                generator.save_profiles(
-                    profiles=profiles,
-                    file_path=os.path.join(sim_dir, "reddit_profiles.json"),
-                    platform="reddit"
-                )
-            
-            if state.enable_twitter:
-                # Twitter使用CSV格式！这是OASIS的要求
-                generator.save_profiles(
-                    profiles=profiles,
-                    file_path=os.path.join(sim_dir, "twitter_profiles.csv"),
-                    platform="twitter"
-                )
-            
+
+            generator = OasisProfileGenerator(graph_id=state.graph_id)
+            generator.save_profiles(
+                profiles=profiles,
+                file_path=profile_path,
+                platform=profile_format,
+            )
+
             if progress_callback:
                 progress_callback(
-                    "generating_profiles", 100, 
-                    f"完成，共 {len(profiles)} 个Profile",
-                    current=len(profiles),
-                    total=len(profiles)
+                    "generating_profiles", 100,
+                    f"Done — {len(profiles)} profiles saved.",
+                    current=len(profiles), total=len(profiles),
                 )
-            
-            # ========== 阶段3: LLM智能生成模拟配置 ==========
+
+            # ---- Stage 3: generate simulation configuration ----
             if progress_callback:
                 progress_callback(
-                    "generating_config", 0, 
-                    "正在分析模拟需求...",
-                    current=0,
-                    total=3
+                    "generating_config", 0, "Analysing simulation requirement...",
+                    current=0, total=3,
                 )
-            
-            config_generator = SimulationConfigGenerator()
-            
+
+            config_gen = SimulationConfigGenerator()
+
             if progress_callback:
                 progress_callback(
-                    "generating_config", 30, 
-                    "正在调用LLM生成配置...",
-                    current=1,
-                    total=3
+                    "generating_config", 30, "Calling LLM to generate config...",
+                    current=1, total=3,
                 )
-            
-            sim_params = config_generator.generate_config(
+
+            sim_params = config_gen.generate_config(
                 simulation_id=simulation_id,
                 project_id=state.project_id,
                 graph_id=state.graph_id,
                 simulation_requirement=simulation_requirement,
                 document_text=document_text,
                 entities=filtered.entities,
-                enable_twitter=state.enable_twitter,
-                enable_reddit=state.enable_reddit
+                environment_type=environment_type,
             )
-            
+
             if progress_callback:
                 progress_callback(
-                    "generating_config", 70, 
-                    "正在保存配置文件...",
-                    current=2,
-                    total=3
+                    "generating_config", 70, "Saving configuration file...",
+                    current=2, total=3,
                 )
-            
-            # 保存配置文件
+
             config_path = os.path.join(sim_dir, "simulation_config.json")
             with open(config_path, 'w', encoding='utf-8') as f:
                 f.write(sim_params.to_json())
-            
+
             state.config_generated = True
             state.config_reasoning = sim_params.generation_reasoning
-            
+
             if progress_callback:
                 progress_callback(
-                    "generating_config", 100, 
-                    "配置生成完成",
-                    current=3,
-                    total=3
+                    "generating_config", 100, "Configuration ready.",
+                    current=3, total=3,
                 )
-            
-            # 注意：运行脚本保留在 backend/scripts/ 目录，不再复制到模拟目录
-            # 启动模拟时，simulation_runner 会从 scripts/ 目录运行脚本
-            
-            # 更新状态
+
+            # Runner scripts live in backend/scripts/ — no copy needed.
             state.status = SimulationStatus.READY
             self._save_simulation_state(state)
-            
-            logger.info(f"模拟准备完成: {simulation_id}, "
-                       f"entities={state.entities_count}, profiles={state.profiles_count}")
-            
+
+            logger.info(
+                "Simulation ready: id=%s entities=%d profiles=%d environment=%s",
+                simulation_id, state.entities_count,
+                state.profiles_count, environment_type,
+            )
             return state
-            
-        except Exception as e:
-            logger.error(f"模拟准备失败: {simulation_id}, error={str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
+
+        except Exception as exc:
+            logger.error(
+                "Simulation preparation failed: id=%s error=%s\n%s",
+                simulation_id, exc, tb.format_exc(),
+            )
             state.status = SimulationStatus.FAILED
-            state.error = str(e)
+            state.error  = str(exc)
             self._save_simulation_state(state)
             raise
-    
+
+    # ------------------------------------------------------------------
+    # Profile generation helpers
+    # ------------------------------------------------------------------
+
+    def _generate_profiles_from_research(
+        self,
+        research_output,
+        agents_per_segment: int,
+        output_platform:    str,
+        progress_callback:  Optional[callable],
+    ) -> List[OasisAgentProfile]:
+        """Generate profiles from a ResearchOutput via ProfileBridge."""
+        from .research.profile_bridge import ProfileBridge
+
+        if progress_callback:
+            progress_callback(
+                "generating_profiles", 10,
+                "Using research pipeline (ProfileBridge)...",
+            )
+
+        bridge   = ProfileBridge()
+        profiles = bridge.generate(
+            research=research_output,
+            agents_per_segment=agents_per_segment,
+            output_platform=output_platform,
+            parallel=True,
+        )
+
+        logger.info(
+            "ProfileBridge generated %d profiles from %d segments.",
+            len(profiles), len(research_output.human_segments),
+        )
+        return profiles
+
+    def _generate_profiles_from_entities(
+        self,
+        filtered,
+        graph_id:             str,
+        use_llm:              bool,
+        parallel_count:       int,
+        realtime_output_path: str,
+        output_platform:      str,
+        progress_callback:    Optional[callable],
+    ) -> List[OasisAgentProfile]:
+        """Generate profiles from graph entities via OasisProfileGenerator."""
+        generator = OasisProfileGenerator(graph_id=graph_id)
+        total     = len(filtered.entities)
+
+        def _on_progress(current: int, total: int, msg: str) -> None:
+            if progress_callback:
+                progress_callback(
+                    "generating_profiles",
+                    int(current / total * 100) if total else 0,
+                    msg,
+                    current=current, total=total, item_name=msg,
+                )
+
+        return generator.generate_profiles_from_entities(
+            entities=filtered.entities,
+            use_llm=use_llm,
+            progress_callback=_on_progress,
+            graph_id=graph_id,
+            parallel_count=parallel_count,
+            realtime_output_path=realtime_output_path,
+            output_platform=output_platform,
+        )
+
+    # ------------------------------------------------------------------
+    # Public: query methods
+    # ------------------------------------------------------------------
+
     def get_simulation(self, simulation_id: str) -> Optional[SimulationState]:
-        """获取模拟状态"""
         return self._load_simulation_state(simulation_id)
-    
-    def list_simulations(self, project_id: Optional[str] = None) -> List[SimulationState]:
-        """列出所有模拟"""
-        simulations = []
-        
-        if os.path.exists(self.SIMULATION_DATA_DIR):
-            for sim_id in os.listdir(self.SIMULATION_DATA_DIR):
-                # 跳过隐藏文件（如 .DS_Store）和非目录文件
-                sim_path = os.path.join(self.SIMULATION_DATA_DIR, sim_id)
-                if sim_id.startswith('.') or not os.path.isdir(sim_path):
-                    continue
-                
-                state = self._load_simulation_state(sim_id)
-                if state:
-                    if project_id is None or state.project_id == project_id:
-                        simulations.append(state)
-        
+
+    def list_simulations(
+        self, project_id: Optional[str] = None
+    ) -> List[SimulationState]:
+        simulations: List[SimulationState] = []
+
+        if not os.path.exists(self.SIMULATION_DATA_DIR):
+            return simulations
+
+        for sim_id in os.listdir(self.SIMULATION_DATA_DIR):
+            sim_path = os.path.join(self.SIMULATION_DATA_DIR, sim_id)
+            if sim_id.startswith('.') or not os.path.isdir(sim_path):
+                continue
+            state = self._load_simulation_state(sim_id)
+            if state and (project_id is None or state.project_id == project_id):
+                simulations.append(state)
+
         return simulations
-    
-    def get_profiles(self, simulation_id: str, platform: str = "reddit") -> List[Dict[str, Any]]:
-        """获取模拟的Agent Profile"""
+
+    def get_profiles(
+        self,
+        simulation_id:    str,
+        # platform is accepted for backwards compat but ignored in favour of
+        # the environment_type stored on the state.
+        platform:         str = "reddit",
+    ) -> List[Dict[str, Any]]:
+        """Return the agent profiles saved for this simulation."""
         state = self._load_simulation_state(simulation_id)
         if not state:
-            raise ValueError(f"模拟不存在: {simulation_id}")
-        
-        sim_dir = self._get_simulation_dir(simulation_id)
-        profile_path = os.path.join(sim_dir, f"{platform}_profiles.json")
-        
+            raise ValueError(f"Simulation not found: {simulation_id}")
+
+        profile_filename, _ = _profile_file_for_environment(state.environment_type)
+        profile_path = os.path.join(
+            self._get_simulation_dir(simulation_id), profile_filename
+        )
+
         if not os.path.exists(profile_path):
-            return []
-        
+            # Backwards compat: try the legacy filename the caller requested
+            legacy_path = os.path.join(
+                self._get_simulation_dir(simulation_id),
+                f"{platform}_profiles.json",
+            )
+            if os.path.exists(legacy_path):
+                profile_path = legacy_path
+            else:
+                return []
+
         with open(profile_path, 'r', encoding='utf-8') as f:
             return json.load(f)
-    
-    def get_simulation_config(self, simulation_id: str) -> Optional[Dict[str, Any]]:
-        """获取模拟配置"""
-        sim_dir = self._get_simulation_dir(simulation_id)
-        config_path = os.path.join(sim_dir, "simulation_config.json")
-        
+
+    def get_simulation_config(
+        self, simulation_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Return the saved simulation_config.json as a dict."""
+        config_path = os.path.join(
+            self._get_simulation_dir(simulation_id), "simulation_config.json"
+        )
         if not os.path.exists(config_path):
             return None
-        
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
-    
+
     def get_run_instructions(self, simulation_id: str) -> Dict[str, str]:
-        """获取运行说明"""
-        sim_dir = self._get_simulation_dir(simulation_id)
+        """Return CLI commands and paths needed to launch the simulation."""
+        state      = self._load_simulation_state(simulation_id)
+        env_type   = state.environment_type if state else ENVIRONMENT_REDDIT
+        sim_dir    = self._get_simulation_dir(simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
-        scripts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts'))
-        
+        scripts_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '../../scripts')
+        )
+
+        # Map environment to the script that runs it
+        script_map = {
+            ENVIRONMENT_CLASSROOM:    "run_classroom_simulation.py",
+            ENVIRONMENT_ORGANISATION: "run_organisation_simulation.py",
+            ENVIRONMENT_TWITTER:      "run_twitter_simulation.py",
+            ENVIRONMENT_REDDIT:       "run_reddit_simulation.py",
+        }
+        primary_script = script_map.get(env_type, "run_reddit_simulation.py")
+        primary_cmd    = (
+            f"python {scripts_dir}/{primary_script} --config {config_path}"
+        )
+
         return {
             "simulation_dir": sim_dir,
-            "scripts_dir": scripts_dir,
-            "config_file": config_path,
+            "scripts_dir":    scripts_dir,
+            "config_file":    config_path,
+            "environment_type": env_type,
             "commands": {
-                "twitter": f"python {scripts_dir}/run_twitter_simulation.py --config {config_path}",
-                "reddit": f"python {scripts_dir}/run_reddit_simulation.py --config {config_path}",
-                "parallel": f"python {scripts_dir}/run_parallel_simulation.py --config {config_path}",
+                env_type: primary_cmd,
+                # Legacy keys so that any frontend code still referencing
+                # "twitter" or "reddit" command keys gets a sensible value.
+                "twitter": (
+                    f"python {scripts_dir}/run_twitter_simulation.py "
+                    f"--config {config_path}"
+                ),
+                "reddit": (
+                    f"python {scripts_dir}/run_reddit_simulation.py "
+                    f"--config {config_path}"
+                ),
             },
             "instructions": (
-                f"1. 激活conda环境: conda activate MiroFish\n"
-                f"2. 运行模拟 (脚本位于 {scripts_dir}):\n"
-                f"   - 单独运行Twitter: python {scripts_dir}/run_twitter_simulation.py --config {config_path}\n"
-                f"   - 单独运行Reddit: python {scripts_dir}/run_reddit_simulation.py --config {config_path}\n"
-                f"   - 并行运行双平台: python {scripts_dir}/run_parallel_simulation.py --config {config_path}"
-            )
+                f"1. Activate the conda environment: conda activate MiroFish\n"
+                f"2. Run the simulation (scripts are in {scripts_dir}):\n"
+                f"   {primary_cmd}"
+            ),
         }
