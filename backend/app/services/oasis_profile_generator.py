@@ -181,7 +181,7 @@ class OasisProfileGenerator:
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
         graph_id: Optional[str] = None,
-        **_kwargs: Any,  # absorb legacy keyword args (e.g. zep_api_key)
+        **_kwargs: Any,  # absorb legacy keyword args (e.g. legacy api_key kwargs)
     ):
         self.api_key = api_key or Config.LLM_API_KEY
         self.base_url = base_url or Config.LLM_BASE_URL
@@ -271,7 +271,7 @@ class OasisProfileGenerator:
         suffix = random.randint(100, 999)
         return f"{username}_{suffix}"
     
-    def _search_zep_for_entity(self, entity: EntityNode) -> Dict[str, Any]:
+    def _search_graph_for_entity(self, entity: EntityNode) -> Dict[str, Any]:
         """
         Search the memory backend for context related to an entity.
 
@@ -373,20 +373,20 @@ class OasisProfileGenerator:
                 context_parts.append("### Related Entity Information\n" + "\n".join(related_info))
 
         # 4. Zep search enrichment
-        zep_results = self._search_zep_for_entity(entity)
+        graph_results = self._search_graph_for_entity(entity)
 
-        if zep_results.get("facts"):
-            new_facts = [f for f in zep_results["facts"] if f not in existing_facts]
+        if graph_results.get("facts"):
+            new_facts = [f for f in graph_results["facts"] if f not in existing_facts]
             if new_facts:
                 context_parts.append(
                     "### Facts Retrieved from Zep\n"
                     + "\n".join(f"- {f}" for f in new_facts[:15])
                 )
 
-        if zep_results.get("node_summaries"):
+        if graph_results.get("node_summaries"):
             context_parts.append(
                 "### Related Nodes Retrieved from Zep\n"
-                + "\n".join(f"- {s}" for s in zep_results["node_summaries"][:10])
+                + "\n".join(f"- {s}" for s in graph_results["node_summaries"][:10])
             )
 
         return "\n\n".join(context_parts)
