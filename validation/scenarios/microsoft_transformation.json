@@ -1,0 +1,215 @@
+{
+  "scenario_id": "microsoft_transformation",
+  "title": "Microsoft Cultural Transformation under Satya Nadella (2014–2019)",
+  "domain": "organisation",
+  "rubric": "organisation",
+  "description": "Satya Nadella became CEO of Microsoft in February 2014 and initiated a multi-year cultural transformation centred on a growth mindset (Carol Dweck's framework), moving from a 'know-it-all' to a 'learn-it-all' culture. The transformation involved restructuring the senior leadership team, retiring the stack-ranking performance system, refocusing the company on cloud and mobile strategy, and embedding psychological safety and continuous learning as core organisational values. By 2019 the transformation was broadly documented as successful: Microsoft's market capitalisation had grown more than fivefold, employee engagement scores had risen, and external observers consistently cited the cultural shift as a key driver.",
+  "artefact": "Growth mindset culture change programme initiated by CEO Satya Nadella, including abolition of stack-ranking, introduction of One Microsoft cross-team collaboration norms, and mandatory leadership coaching",
+  "timeframe": "2014–2019",
+  "sources": [
+    "Nadella, S. (2017). Hit Refresh. HarperCollins.",
+    "Hess, E.D. & Ludwig, K. (2017). Humility Is the New Smart. Berrett-Koehler.",
+    "McKinsey & Company (2018). 'Microsoft's cultural transformation'. McKinsey Quarterly.",
+    "Chamorro-Premuzic, T. (2019). 'How Microsoft became innovative again'. Harvard Business Review.",
+    "Microsoft Annual Reports 2014–2019."
+  ],
+  "segment_outcomes": [
+    {
+      "segment_name": "Senior Leadership Team",
+      "description": "C-suite and direct reports to Nadella — the guiding coalition responsible for modelling and cascading the cultural change",
+      "expected_behaviours": [
+        "Publicly articulate a compelling burning platform: Microsoft risks irrelevance if culture does not change",
+        "Form a credible guiding coalition of senior leaders who visibly role-model growth mindset",
+        "Communicate a clear strategic vision: mobile-first, cloud-first, with people as the differentiating asset",
+        "Remove structural barrier — abolish stack-ranking performance management system",
+        "Celebrate early visible wins such as Azure revenue growth and cross-team product collaborations",
+        "Sustain momentum by linking performance reviews to learning behaviours, not just output metrics",
+        "Institutionalise growth mindset language in leadership rituals, onboarding, and annual reviews"
+      ],
+      "unexpected_behaviours": [
+        "Reverting to competitive intra-team ranking after abolishing stack-ranking",
+        "Declaring cultural transformation complete before employee engagement data confirms adoption",
+        "Communicating strategy without acknowledging past cultural failures (arrogance, silos)"
+      ],
+      "measurable_outcomes": {
+        "market_cap_cagr_2014_2019": "~32% per year",
+        "azure_revenue_growth": "from near-zero to $10B+ annual run rate by 2018",
+        "employee_engagement_lift": "reported improvement in Microsoft's annual poll, 2015–2018"
+      },
+      "framework_mappings": [
+        {
+          "framework": "kotter",
+          "stage_or_state": "1. Create Urgency",
+          "notes": "Nadella opened with the burning-platform message: mobile and cloud were disrupting Microsoft's core markets."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "2. Build a Guiding Coalition",
+          "notes": "Nadella restructured the SLT to remove leaders who embodied the old 'know-it-all' culture."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "3. Form a Strategic Vision",
+          "notes": "Mobile-first, cloud-first was communicated as the unified direction replacing fragmented Windows-centric strategy."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "5. Enable Action (remove barriers)",
+          "notes": "Stack-ranking abolished; cross-team collaboration metrics introduced to replace internal competition incentives."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "6. Generate Short-term Wins",
+          "notes": "Azure milestones and Office 365 growth were repeatedly cited as proof points in all-hands communications."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "8. Institute Change",
+          "notes": "Growth mindset embedded in hiring criteria, onboarding curriculum, and performance review templates."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Awareness",
+          "notes": "SLT was aware of the need for change from day one — Nadella's first email to all employees stated the urgency."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Desire",
+          "notes": "SLT expressed desire publicly through symbolic acts: Nadella writing Hit Refresh, retiring internal competition practices."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Knowledge",
+          "notes": "SLT undertook leadership coaching and read Carol Dweck's Mindset; Dweck was brought in as an adviser."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Ability",
+          "notes": "SLT demonstrated new behaviours in public forums: vulnerability, cross-team credit-sharing, admitting past mistakes."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Reinforcement",
+          "notes": "Performance review criteria updated to reward learning behaviours; growth mindset integrated into leadership competency models."
+        }
+      ],
+      "source_notes": "Primarily sourced from Nadella (2017), McKinsey (2018), and Microsoft HR disclosures 2015–2018."
+    },
+    {
+      "segment_name": "Middle Management",
+      "description": "Directors and senior managers across engineering, sales, and product divisions — the layer responsible for translating cultural change into daily team practices",
+      "expected_behaviours": [
+        "Adopt and model growth mindset language in team meetings and 1:1s by end of 2015",
+        "Discontinue behaviours that rewarded internal competition (hoarding resources, sabotaging peer teams)",
+        "Enable cross-team collaboration by sharing roadmaps and pooling engineering resources where directed",
+        "Celebrate short-term wins within their teams to build psychological safety",
+        "Identify and remove local bureaucratic barriers to the transformation",
+        "Show variable adoption pace — some divisions adopted faster (Cloud) than others (legacy Windows)"
+      ],
+      "unexpected_behaviours": [
+        "Passive resistance by managing upward appearance while maintaining competitive silo behaviour privately",
+        "Over-compliance theatre: superficial use of 'growth mindset' language without behavioural change"
+      ],
+      "measurable_outcomes": {
+        "adoption_pace": "faster in cloud-aligned divisions; slower in legacy Windows and hardware teams",
+        "cross_team_collaboration_increase": "measurable rise in cross-division project participation by 2016"
+      },
+      "framework_mappings": [
+        {
+          "framework": "kotter",
+          "stage_or_state": "4. Enlist a Volunteer Army",
+          "notes": "Middle managers were the primary target of the volunteer army stage — early adopters visibly celebrated by SLT."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "5. Enable Action (remove barriers)",
+          "notes": "Managers with authority to modify team structures and resource-sharing practices were expected to act."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "6. Generate Short-term Wins",
+          "notes": "Division-level wins (product launches, cross-team partnerships) celebrated in internal communications."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Desire",
+          "notes": "By mid-2015, most middle managers had received the message and had to decide whether to commit. Documented split: majority moved to Desire; minority remained in compliance-only mode."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Knowledge",
+          "notes": "Growth mindset workshops and manager coaching programmes rolled out 2015–2016."
+        }
+      ],
+      "source_notes": "McKinsey (2018) case study; Microsoft internal survey data cited in Chamorro-Premuzic (2019)."
+    },
+    {
+      "segment_name": "Individual Contributors",
+      "description": "Engineers, programme managers, and individual sales contributors — the broad employee base whose daily behaviours constitute the cultural reality of the transformation",
+      "expected_behaviours": [
+        "Initial scepticism and wait-and-see posture in 2014: employees had seen change programmes come and go",
+        "Gradual engagement as stack-ranking removal became real and visible in 2015 performance cycles",
+        "Adoption of collaborative practices as incentive structures shifted from individual competition to team outcomes",
+        "Participation in cross-team projects and hackathons as psychological safety increased",
+        "Vocal minority of early adopters who championed the change bottom-up, building informal coalitions",
+        "Persistent laggard segment in legacy divisions who remained in Awareness-only state through 2017"
+      ],
+      "unexpected_behaviours": [
+        "Mass voluntary attrition in protest at the transformation (not documented; churn remained within normal bounds)",
+        "Immediate full adoption in 2014 before structural changes were made"
+      ],
+      "measurable_outcomes": {
+        "employee_engagement_survey_trend": "steady improvement 2015–2018 across most divisions",
+        "voluntary_attrition_rate": "remained within industry norms; no documented exodus",
+        "hackathon_participation": "significant increase in cross-team hackathon entries 2015–2018"
+      },
+      "framework_mappings": [
+        {
+          "framework": "kotter",
+          "stage_or_state": "4. Enlist a Volunteer Army",
+          "notes": "ICs who adopted early became peer change advocates; SLT amplified their stories in internal communications."
+        },
+        {
+          "framework": "kotter",
+          "stage_or_state": "7. Sustain Acceleration",
+          "notes": "Broad IC adoption only solidified from 2016 onward — SLT resisted declaring victory prematurely."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Awareness",
+          "notes": "All ICs reached Awareness by mid-2014 through Nadella's all-hands communications and the public removal of stack-ranking."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Desire",
+          "notes": "Desire emerged heterogeneously: cloud-aligned ICs moved to Desire quickly; legacy-division ICs remained ambivalent through 2015–2016."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Knowledge",
+          "notes": "Growth mindset training rolled out to ICs as opt-in initially (2015), mandatory onboarding from 2016."
+        },
+        {
+          "framework": "adkar",
+          "stage_or_state": "Ability",
+          "notes": "Behavioural change demonstrable in cross-team collaboration metrics from 2016 onward."
+        }
+      ],
+      "source_notes": "Microsoft Annual Reports; Chamorro-Premuzic (2019); public LinkedIn/Glassdoor sentiment analysis cited in secondary sources."
+    }
+  ],
+  "scenario_level_outcomes": {
+    "market_cap_2014": "~$300B USD",
+    "market_cap_2019": "~$1.1T USD",
+    "primary_driver_cited": "Cloud growth (Azure) enabled by cultural shift to collaboration and learning",
+    "transformation_assessment": "Broadly successful by 2019; cited as a canonical corporate culture change case study"
+  },
+  "metadata": {
+    "cynefin_domain": "Complex (emergent practices; probe-sense-respond)",
+    "cynefin_rationale": "The transformation involved emergent adoption patterns that could not be top-down scripted — Nadella used probe-sense-respond: pilot growth mindset workshops, observe uptake, amplify successes, adjust incentives. No single leader orchestrated every individual's change journey.",
+    "primary_framework": "kotter",
+    "secondary_framework": "adkar",
+    "complexity_framework": "cynefin",
+    "tags": ["culture-change", "growth-mindset", "tech-company", "ceo-led-transformation", "microsoft"]
+  }
+}

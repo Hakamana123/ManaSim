@@ -1,0 +1,180 @@
+{
+  "scenario_id": "covid_edtech_adoption",
+  "title": "Emergency EdTech Adoption During COVID-19 School Closures (2020–2021)",
+  "domain": "education",
+  "rubric": "education",
+  "description": "In March 2020, school systems worldwide closed due to the COVID-19 pandemic, forcing an overnight shift to remote and hybrid teaching. Teachers were required to adopt video-conferencing platforms (Zoom, Teams, Google Meet), learning management systems (Google Classroom, Moodle, Canvas), and AI-assisted tools within days rather than through planned rollouts. The adoption was uneven across task types: teachers quickly delegated routine instructional tasks to digital platforms but showed strong resistance to delegating pastoral care, inspiration, and relationship-based tasks to AI tools. By 2021, research (including OECD, UNESCO, EdTech Hub reports) had documented patterns in which task types teachers adopted AI/digital assistance for, which they retained as teacher-led, and where principled negotiation occurred in the contested middle zone.",
+  "artefact": "Emergency shift to remote teaching requiring immediate adoption of LMS platforms, video-conferencing tools, and AI-assisted instructional aids across K-12 and higher education institutions",
+  "timeframe": "March 2020 – June 2021",
+  "sources": [
+    "OECD (2020). 'A framework to guide an education response to the COVID-19 Pandemic of 2020'. OECD Publishing.",
+    "UNESCO (2020). 'Education: From disruption to recovery'. UNESCO COVID-19 Education Response.",
+    "EdTech Hub (2021). 'EdTech and COVID-19: What we know so far'. EdTech Hub Helpdesk Report.",
+    "Dhawan, S. (2020). 'Online learning: A panacea in the time of COVID-19 crisis?' Journal of Educational Technology Systems, 49(1), 5–22.",
+    "Rapanta, C. et al. (2020). 'Online university teaching during and after the COVID-19 crisis'. Postdigital Science and Education, 2, 923–945.",
+    "Trust, T. & Whalen, J. (2020). 'Should teachers be trained in emergency remote teaching? Lessons learned from the COVID-19 pandemic'. Journal of Technology and Teacher Education, 28(2), 189–199."
+  ],
+  "segment_outcomes": [
+    {
+      "segment_name": "Classroom Teachers",
+      "description": "K-12 and tertiary classroom teachers who had primary responsibility for delivering instruction and maintaining student welfare during the transition to remote teaching",
+      "expected_behaviours": [
+        "Rapidly adopt video-conferencing and LMS for Zone 1 instructional tasks (content delivery, quizzes, homework marking) with AI or platform automation where available",
+        "Resist or consciously limit AI involvement in pastoral care conversations, emotional support, and student welfare check-ins (Zone 3)",
+        "Negotiate Zone 2 tasks (assignment feedback, essay analysis, student progress evaluation) case-by-case: use AI drafts but apply personal judgment before communicating to students",
+        "Raise technical constraint concerns: poor student internet access, device availability, and platform reliability limits on what AI tools can be trusted to handle",
+        "Express ethical concern about student data privacy when adopting third-party AI marking and analytics tools",
+        "Adapt AI use to contextual constraints: students with disabilities, students in low-connectivity rural areas, and students with difficult home environments required teacher-led rather than AI-mediated approaches",
+        "Show high variance in adoption pace: tech-confident teachers adopted Zone 2 AI tools immediately; resistant teachers required collegial modelling and institutional mandates"
+      ],
+      "unexpected_behaviours": [
+        "Delegating student mental health and wellbeing check-ins entirely to AI chatbots without teacher follow-up",
+        "Uniform rejection of all AI tools regardless of task type (total luddism not documented at scale)",
+        "Adopting AI marking for creative tasks such as essays and art projects without any teacher review"
+      ],
+      "measurable_outcomes": {
+        "lms_adoption_rate_2020": "~90% of schools in OECD countries had an active LMS by June 2020",
+        "ai_marking_tool_uptake": "moderate uptake for multiple-choice and procedural tasks; low for open-ended tasks",
+        "teacher_concern_categories": "data privacy (highest), technical reliability, student equity, loss of relationship",
+        "pastoral_ai_delegation_rate": "near-zero documented delegation of pastoral care tasks to AI in peer-reviewed literature"
+      },
+      "framework_mappings": [
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 1 — Procedural Tasks (AI-led)",
+          "notes": "Teachers adopted automated quiz platforms and AI-assisted homework checking tools rapidly for procedural tasks. Delegation was high."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 1 — Knowledge Recall Tasks (AI-led)",
+          "notes": "Flashcard apps, adaptive recall platforms (Quizlet, Kahoot), and LMS quiz modules were adopted for knowledge recall with minimal teacher resistance."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 1 — Knowledge Explanation Tasks (AI-led/shared)",
+          "notes": "Pre-recorded explainer videos and AI tutoring tools used for initial knowledge explanation, but teachers retained live Q&A and conceptual clarification."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 2 — Application Tasks (shared AI–teacher)",
+          "notes": "AI tools used to generate application problems; teachers reviewed and curated for contextual fit before assigning."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 2 — Analytical Tasks (shared AI–teacher)",
+          "notes": "AI analytics dashboards used to identify student performance gaps; teachers applied judgment about intervention strategy."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 2 — Evaluative Tasks (shared AI–teacher)",
+          "notes": "Contested: AI rubric-based marking used as first-pass on written work; teacher final judgment retained. Principled negotiation documented."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 3 — Creative Tasks (Teacher-led)",
+          "notes": "Teachers consistently retained creative task design and assessment. AI-generated creative prompts used as starting points only, with teacher curation."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 3 — Inspiration Tasks (Teacher-led)",
+          "notes": "Motivational and inspirational interactions retained as teacher-led. No documented cases of AI substitution for teacher-student inspirational relationships at scale."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 3 — Pastoral Care Tasks (Teacher-led)",
+          "notes": "Wellbeing check-ins, mental health referrals, and relationship maintenance explicitly retained by teachers. AI chatbot wellbeing tools trialled in a minority of institutions but with teacher oversight required."
+        }
+      ],
+      "source_notes": "OECD (2020), UNESCO (2020), EdTech Hub (2021), Trust & Whalen (2020), Rapanta et al. (2020)."
+    },
+    {
+      "segment_name": "School Administrators",
+      "description": "Principals, department heads, and district administrators who set institutional policy for EdTech adoption and managed teacher support during the transition",
+      "expected_behaviours": [
+        "Issue rapid guidance on which platforms were institutionally approved to address technical and data-privacy constraints",
+        "Provide technical training resources for Zone 1 tool adoption (LMS, video-conferencing)",
+        "Explicitly advise teachers to retain pastoral care and wellbeing tasks as teacher-led (document the boundary)",
+        "Balance equity concerns: students without devices or reliable internet required differentiated approaches that limited AI-first strategies",
+        "Show tension between speed of adoption mandate and contextual constraint awareness",
+        "Acknowledge contestable overlap: give teachers professional autonomy over Zone 2 task decisions rather than mandating AI use"
+      ],
+      "unexpected_behaviours": [
+        "Mandating AI for all teaching tasks including pastoral care to reduce teacher workload",
+        "Ignoring student device and connectivity equity concerns in favour of universal AI adoption"
+      ],
+      "measurable_outcomes": {
+        "institutional_policy_response_time": "most OECD school systems issued EdTech guidance within 2–4 weeks of closure",
+        "equity_gap_acknowledgement": "majority of national policies explicitly acknowledged digital equity gap by May 2020"
+      },
+      "framework_mappings": [
+        {
+          "framework": "aittts",
+          "stage_or_state": "Constraint Adherence — Technical",
+          "notes": "Administrators were the primary actors addressing technical constraints: approved platform lists, device lending schemes, bandwidth requirements."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Constraint Adherence — Contextual",
+          "notes": "Equity-based contextual constraints were addressed at administrator level: differentiated policies for rural, low-income, and special-needs cohorts."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Constraint Adherence — Ethical",
+          "notes": "Data privacy reviews and GDPR compliance checks were administrator-led before AI tool adoption was approved."
+        }
+      ],
+      "source_notes": "OECD (2020) country reports; UNESCO national policy tracker March–June 2020."
+    },
+    {
+      "segment_name": "Students",
+      "description": "K-12 and tertiary students who experienced the shift to remote learning and interacted with AI-assisted tools as end-users",
+      "expected_behaviours": [
+        "High adoption of AI-assisted Zone 1 tools (adaptive quiz apps, explainer videos) for self-directed knowledge recall and procedural practice",
+        "Expect and seek teacher presence for pastoral care, motivation, and relationship tasks — low tolerance for AI substitution in these areas",
+        "Variable adoption of Zone 2 analytical tools: older students (tertiary) more comfortable using AI-generated feedback as input to their own analysis",
+        "Express concerns about fairness and authenticity when AI marking is applied to creative or evaluative work without teacher oversight",
+        "Show digital equity stratification: students with poor connectivity or shared devices had limited access to AI-first learning tools"
+      ],
+      "unexpected_behaviours": [
+        "Preferring AI chatbot pastoral care over human teacher contact (not documented at scale)",
+        "Uniform rejection of all online learning tools (some resistance documented, but not majority behaviour)"
+      ],
+      "measurable_outcomes": {
+        "self_directed_ai_tool_use": "significant increase in student-initiated use of Zone 1 AI tools during school closures",
+        "teacher_contact_preference": "surveys showed students consistently preferred human teacher contact for wellbeing and motivation",
+        "digital_equity_impact": "UNESCO documented 826 million students without home computers; AI adoption strongly skewed to high-income contexts"
+      },
+      "framework_mappings": [
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 1 — Knowledge Recall Tasks (AI-led)",
+          "notes": "Students self-initiated use of Quizlet, Khan Academy, and adaptive recall platforms at scale during closures."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Zone 3 — Pastoral Care Tasks (Teacher-led)",
+          "notes": "Students expressed need for human teacher pastoral care; AI wellbeing chatbots did not substitute documented student preference for teacher relationship."
+        },
+        {
+          "framework": "aittts",
+          "stage_or_state": "Constraint Adherence — Contextual",
+          "notes": "Digital equity stratification was a dominant contextual constraint shaping student experience of AI-assisted learning."
+        }
+      ],
+      "source_notes": "UNESCO (2020) equity data; OECD PISA Insights; EdTech Hub student experience reports."
+    }
+  ],
+  "scenario_level_outcomes": {
+    "global_lms_adoption_spike": "LMS daily active user counts increased 10–20x in March–April 2020 across major platforms",
+    "ai_task_delegation_pattern": "Zone 1 tasks (procedural, recall, explanation) showed highest AI delegation; Zone 3 tasks (pastoral, inspiration, creative) showed lowest",
+    "equity_gap_widened": "Pre-existing digital equity gaps widened; UNESCO estimated 826M students lacked home computing access",
+    "teacher_professional_identity": "Research documented teachers asserting professional identity around Zone 3 tasks as a response to perceived AI encroachment",
+    "zone_2_negotiation_evidence": "Peer-reviewed studies documented active teacher negotiation in Zone 2, particularly around AI marking of written work"
+  },
+  "metadata": {
+    "primary_framework": "aittts",
+    "tags": ["edtech", "covid-19", "emergency-remote-teaching", "ai-in-education", "teacher-professional-identity", "digital-equity"],
+    "aittts_version": "AI-Teacher Teaching Task Spectrum (ManaSim implementation)",
+    "scenario_note": "This scenario is particularly useful for testing whether teacher agents resist inappropriate AI delegation of Zone 3 tasks under pressure, and whether they negotiate Zone 2 tasks with principled reasoning rather than defaulting to full AI or full teacher control."
+  }
+}
